@@ -534,3 +534,91 @@ find.mature.ones.for.expressed.miRNAs = function(list.expressed.miRNAs)
   return(expressed.miRNAs)
 }
 
+find.replicates.by.removing.ID = function(x)
+{
+  infos = unlist(strsplit(x, "_"))
+  return(paste0(infos[-length(infos)], collapse = '_'))
+}
+
+average.biological.replicates = function(cpm)
+{
+  cpm = cpm.piRNA;
+  samples = sapply(colnames(cpm), find.replicates.by.removing.ID, USE.NAMES = FALSE)
+  samples.uniq = unique(samples)
+  
+  if(length(samples.uniq) == length(samples)){
+    cat('---no replicates exist---')
+  }else{
+    cpm.mean = matrix(NA, nrow = nrow(cpm), ncol=length(samples.uniq))
+    rownames(cpm.mean) = rownames(cpm)
+    colnames(cpm.mean) = samples.uniq;
+    
+    for(n in 1:ncol(cpm.mean))
+    {
+      kk = which(samples == colnames(cpm.mean)[n])
+      if(length(kk)>1){
+        cpm.mean[ ,n] = apply(as.matrix(cpm[,kk]), 1, mean)
+      }else{
+        if(length(kk)==1) cpm.mean[, n] = cpm[,kk]
+      }
+    }
+  }
+  
+  return(cpm.mean)
+  
+}
+
+remove.batch.using.N2.untreated = function(cpm, reference = "N2_whole.body_untreated", method = "linear.model")
+{
+  cpm = cpm.piRNA.mean.rep
+  logcpm = log2(cpm + 2^-6)
+  
+  if(method == 'linear.model'){
+    ## use the linear model for data the log2 scale to remove the batch effect
+    ## need to further confirm 
+    genotypes = sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[1], USE.NAMES = FALSE)
+    ns =  sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    treatment = sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[3], USE.NAMES = FALSE)
+    pheno = data.frame(genotypes, ns, treatment)
+    
+    jj.N2.untreated = which(pheno$genotypes=="N2" & pheno$treatment == "untreated")
+    for(n in 1:nrow(pheno)){
+      if(pheno$genotypes[n] != "N2" & pheno$treatment[n] == "untreated" ){
+        cat(n, "--", colnames(cpm)[n], "\n")   
+        x = logcpm[, n]
+        y = logcpm[, jj.N2.untreated]
+        fit = lm(y ~ x)
+        #plot(x, y);
+        #abline(fit, col='red', lwd=2.0)
+        jj.to.correct = which(pheno$ns == pheno$ns[n] & pheno$genotypes == pheno$genotypes[n])
+        for(j in jj.to.correct) logcpm[, j]  = logcpm[, j]*fit$coefficients[2] + fit$coefficients[1]
+      }
+    }
+  }
+  
+  if(method == 'ComBat'){
+    ## here we use the combat to remove the batch effect 
+    ## the combat requires the log2cpm
+    
+    # example from the ComBat function in the R package 'sva'
+    TEST.example = FALSE
+    if(TEST.example){
+      library(bladderbatch)
+      data(bladderdata)
+      dat <- bladderEset[1:50,]
+      pheno = pData(dat)
+      edata = exprs(dat)
+      batch = pheno$batch
+      mod = model.matrix(~as.factor(cancer), data=pheno)
+      combat_edata3 = ComBat(dat=edata, batch=batch, mod=mod, par.prior=TRUE, ref.batch=3)
+    }
+    
+    batch = rep(c(1:(ncol(cpm)/2)), each = 2)
+    conds = data.frame(rep(c("untreated", "treated"), ncol(cpm)/2))
+    colnames(conds) = 'treatment'
+    mod = model.matrix(~ as.factor(treatment), conds)
+    combat_edata3 = ComBat(dat=logcpm, batch=batch, mod=mod, par.prior=TRUE, ref.batch=3)
+  }
+  
+  return(2^logcpm)
+}
