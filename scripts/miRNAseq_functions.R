@@ -542,7 +542,7 @@ find.replicates.by.removing.ID = function(x)
 
 average.biological.replicates = function(cpm)
 {
-  cpm = cpm.piRNA;
+  # cpm = cpm.piRNA.bc;
   samples = sapply(colnames(cpm), find.replicates.by.removing.ID, USE.NAMES = FALSE)
   samples.uniq = unique(samples)
   
@@ -568,38 +568,62 @@ average.biological.replicates = function(cpm)
   
 }
 
-remove.batch.using.N2.untreated = function(cpm, reference = "N2_whole.body_untreated", method = "linear.model")
+remove.batch.using.N2.untreated = function(cpm, design.matrix, method = "linear.model")
 {
-  cpm = cpm.piRNA.mean.rep
+  # cpm = cpm.piRNA
   logcpm = log2(cpm + 2^-6)
   
   if(method == 'linear.model'){
-    ## use the linear model for data the log2 scale to remove the batch effect
-    ## need to further confirm 
-    genotypes = sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[1], USE.NAMES = FALSE)
-    ns =  sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
-    treatment = sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[3], USE.NAMES = FALSE)
-    pheno = data.frame(genotypes, ns, treatment)
+    ## use the linear model for data the log2 scale (sample by sample, NOT gene by gene) to remove the batch effect; use N2 untreated condtion as references
+    ## (NOT used here)
+    cat('Warnings -- use limma or ComBat instead of this method ')
     
-    jj.N2.untreated = which(pheno$genotypes=="N2" & pheno$treatment == "untreated")
-    for(n in 1:nrow(pheno)){
-      if(pheno$genotypes[n] != "N2" & pheno$treatment[n] == "untreated" ){
-        cat(n, "--", colnames(cpm)[n], "\n")   
-        x = logcpm[, n]
-        y = logcpm[, jj.N2.untreated]
+    #reference = "N2_whole.body_untreated"
+    #genotypes = sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[1], USE.NAMES = FALSE)
+    #ns =  sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    #treatment = sapply(colnames(cpm), function(x) unlist(strsplit(x, "_"))[3], USE.NAMES = FALSE)
+    pheno = data.frame(design.matrix, stringsAsFactors = FALSE)
+    
+    jj.N2.untreated = which(pheno$genotype=="N2" & pheno$treatment == "untreated" & pheno$batch == 1)
+    batchs = unique(pheno$batch)
+    batchs = batchs[which(batchs != 1)]
+    for(n in 1:length(batchs))
+    {
+      jj.untreated = which(pheno$batch == batchs[n] & pheno$treatment == "untreated")
+      if(length(jj.untreated)>0)
+      {
+        if(length(jj.untreated) == 1) x = logcpm[, jj.untreated]
+        if(length(jj.untreated)>1) x = apply(logcpm[, jj.untreated], 1, mean)
+        y = apply(logcpm[, jj.N2.untreated], 1, mean)
         fit = lm(y ~ x)
         #plot(x, y);
         #abline(fit, col='red', lwd=2.0)
-        jj.to.correct = which(pheno$ns == pheno$ns[n] & pheno$genotypes == pheno$genotypes[n])
-        for(j in jj.to.correct) logcpm[, j]  = logcpm[, j]*fit$coefficients[2] + fit$coefficients[1]
+        jj.to.correct = which(pheno$batch == batchs[n])
+        for(j in jj.to.correct) {
+          logcpm[, j]  = logcpm[, j]*fit$coefficients[2] + fit$coefficients[1];
+          cat(colnames(cpm)[j], "-intercept-", fit$coefficients[1], " - slop -", fit$coefficient[2],  "\n")   
+        }
       }
     }
+    logcpm.bc = logcpm;
   }
   
-  if(method == 'ComBat'){
+  if(method == 'limma'){
+    
+    cat('remove the batch effect using limma \n')
+    require('limma')
+    design.tokeep = design.matrix
+    design.tokeep$tissue.cell[which(design.tokeep$treatment == "untreated")] = 'whole.body'
+    design.tokeep$tissue.cell[which(design.tokeep$genotype=="N2" & design.tokeep$treatment=="treated")] = "background"
+    design.tokeep<-model.matrix(~0 + tissue.cell,  data = design.tokeep)
+    logcpm.bc = removeBatchEffect(logcpm, batch = design.matrix$batch, design = design.tokeep)
+    
+  }
+  if(method == 'combat'){
     ## here we use the combat to remove the batch effect 
     ## the combat requires the log2cpm
-    
+    cat('remove the batch effect using ComBat \n')
+    require("sva")
     # example from the ComBat function in the R package 'sva'
     TEST.example = FALSE
     if(TEST.example){
@@ -613,12 +637,86 @@ remove.batch.using.N2.untreated = function(cpm, reference = "N2_whole.body_untre
       combat_edata3 = ComBat(dat=edata, batch=batch, mod=mod, par.prior=TRUE, ref.batch=3)
     }
     
-    batch = rep(c(1:(ncol(cpm)/2)), each = 2)
-    conds = data.frame(rep(c("untreated", "treated"), ncol(cpm)/2))
-    colnames(conds) = 'treatment'
-    mod = model.matrix(~ as.factor(treatment), conds)
-    combat_edata3 = ComBat(dat=logcpm, batch=batch, mod=mod, par.prior=TRUE, ref.batch=3)
+    batch = design.matrix$batch;
+    design.tokeep = design.matrix
+    design.tokeep$tissue.cell[which(design.tokeep$treatment == "untreated")] = 'whole.body'
+    design.tokeep$tissue.cell[which(design.tokeep$genotype=="N2" & design.tokeep$treatment=="treated")] = "background"
+    mod = model.matrix(~ as.factor(tissue.cell), data = design.tokeep);
+    #conds = data.frame(rep(c("untreated", "treated"), ncol(cpm)/2))
+    #colnames(conds) = 'treatment'
+    #mod = model.matrix(~ as.factor(treatment), conds)
+    logcpm.bc = ComBat(dat=logcpm, batch=batch, mod=mod, par.prior=TRUE, ref.batch=1)
   }
   
-  return(2^logcpm)
+  return(2^logcpm.bc)
 }
+
+Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
+{
+  ## here is a function to test piRNA normalization and batchRemoval for the gene expression matrix in deconvolution analysis
+  ## there will be one PCA plot and four samll plots for the positive controls
+  # cpm = cpm.piRNA
+  main.names = deparse(substitute(cpm)) 
+  if(any(cpm==0)) cpm = cpm + 2^-6 
+  
+  require(lattice);
+  require(ggplot2)
+  require('DESeq2');
+  library("vsn");
+  library("pheatmap");
+  library("RColorBrewer");
+  library("dplyr");
+  
+  ## pca plots only for untreated samples
+  pca = prcomp(t(log2(cpm)), scale. = FALSE, center = FALSE)
+  pca2save = data.frame(pca$x, condition=design.matrix$treatment, batch = design.matrix$batch, name=colnames(cpm), tissue = design.matrix$tissue.cell)
+  sels = which(pca2save$condition == "untreated")
+  ggp = ggplot(data=pca2save[sels, ], aes(PC1, PC2, label = batch, color = tissue)) + geom_point(size=4) +
+    geom_text(hjust = 0.1, nudge_y = 0.1, size=5) +
+    ggtitle(paste0("PCA - ", main.names))
+  plot(ggp);
+  #pca=plotPCA(cpm, intgroup = colnames(design.matrix)[c(3, 5, 7)], returnData = FALSE)
+  #print(pca)
+  
+  ## ratio between treated and untreated to test if piRNA normalization makes sense
+  ns = unique(design.matrix$tissue.cell)
+  ratios = matrix(NA, ncol = length(ns), nrow = nrow(cpm))
+  rownames(ratios) = rownames(cpm);
+  colnames(ratios) = ns
+  total = ratios;
+  tcs = ratios;
+  for(n in 1:length(ns))
+  {
+    #jj = which(design.matrix$tissue.cell==ns[n])
+    total[,n] = apply(cpm[, which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")], 1, mean)
+    tcs[,n] = apply(cpm[, which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")], 1, mean)
+    ratios[,n] = tcs[,n]/total[,n] 
+  }
+  
+  par(mfrow=c(2, 2))
+  hist(log10(ratios), xlab = "log10(treated/untreated)", main = paste0(main.names), breaks = 100)
+  abline(v=c(-3:0), col='darkred', lwd=2.0)
+  
+  ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
+  kk = which(rownames(cpm)=='lsy-6')
+  lims = range(c(total[kk, ], tcs[kk,]))
+  plot(c(1:length(ns)), tcs[kk, ], type= 'b', col='darkblue', cex=2.0, log='y', ylim =lims, main = paste0("lsy-6 in ", main.names), xlab=NA, 
+       ylab = 'normalizaed by piRNAs (in log)', axe = FALSE)
+  points(c(1:length(ns)), total[kk, ], type= 'b', col='black', cex=2.0)
+  legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
+  axis(2, las= 1)
+  ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
+  ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
+  axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
+  box()
+  
+  plot(tcs[,which(colnames(tcs) == "Dopaminergic.neurons")], tcs[,which(colnames(tcs) == "Ciliated.sensory.neurons")], log='xy', 
+       xlab='Dopaminergic (in log)', ylab='Ciliated (in log)', main = main.names)
+  abline(0, 1, lwd=2.0, col='red')
+  
+  plot(tcs[,which(colnames(tcs) == "mechanosensory.neurons" )], tcs[,which(colnames(tcs) == "unc-86.expressing.neurons")], log='xy', 
+       xlab='mechanosensory (in log)', ylab='unc-86 (in log)', main = main.names)
+  abline(0, 1, lwd=2.0, col='red')
+  
+}
+
