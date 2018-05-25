@@ -18,10 +18,14 @@ find.neuronSamples.promoters = function(x)
 }
 
 dataDir = "../results/miRNAs_neurons_v1_2018_03_07/tables"
+RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
+
 version.analysis = "20180506"
-Save.Processed.Tables = TRUE
+Save.Processed.Tables = FALSE
+
 resDir = "../results/tables_for_decomvolution"
 if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(RdataDir)) dir.create(RdataDir)
 
 ##################################################
 ##################################################
@@ -108,6 +112,8 @@ dev.off()
 
 if(Save.Processed.Tables)
 {
+  save(enrich.matrix.sel, enrich.matrix, 
+       file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.analysis, ".Rdata"))
   write.table(enrich.matrix.sel, file = paste0(resDir, "/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   write.table(enrich.matrix, file = paste0(resDir, "/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses.txt"), 

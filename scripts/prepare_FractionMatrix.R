@@ -124,7 +124,7 @@ if(Save.Processed.Tables)
   save(mapping, neurons, proportions, 
        file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", version.Fraction.Matrix, ".Rdata"))
   
-  write.table(proportions, file = paste0(resDir, "/Proportions_Matrix_14_samples_96_neuronClasses.txt"), sep = "\t", col.names = TRUE, row.names = TRUE, 
+  write.table(proportions, file = paste0(resDir, "/Proportions_Matrix_14_samples_96_neuronClasses_cellNumbers.txt"), sep = "\t", col.names = TRUE, row.names = TRUE, 
               quote = FALSE)
 }
 
@@ -147,7 +147,6 @@ pheatmap(proportions, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TR
          color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
 
 dev.off()
-
 
 #nns = sapply(neurons, find.neuron.class)
 #nns.uniq = unique(nns)

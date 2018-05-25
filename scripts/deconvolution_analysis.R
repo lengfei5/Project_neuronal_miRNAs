@@ -8,21 +8,78 @@
 ## Date of creation: Fri May 25 08:00:23 2018
 ##########################################################################
 ##########################################################################
-RdataDir = paste0("../results/miRNAs_neurons_v1_2018_03_07/Rdata/")
+RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 
 version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
+version.Fraction.Matrix = "_miRNAs_neurons_20180525"
+version.EnrichscoreMatrix = "20180506"
 
 resDir = "../results/decomvolution_results"
 if(!dir.exists(resDir)) dir.create(resDir)
 
-fitting.space = "linear" ## linear or log2 transformed for expression matrix
-
+fitting.space = "logscale" ## linear or log2 transformed for expression matrix
 
 ######################################
 ######################################
 ## Section: import the fraction matrix and expression matrix
 ######################################
 ######################################
+## load and process fraction matrix
+load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", version.Fraction.Matrix, ".Rdata"))
+
+
+## load and process the enrichment score matrix and the expression matrix
+load(file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.EnrichscoreMatrix, ".Rdata"))
+enriched.list = colnames(enrich.matrix.sel)
+#enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
+
+load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
+jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
+total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
+xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
+ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+colnames(xx) = c('whole.body', 'background', ncs)
+
+####################
+## here we transform the gene expression by e'= (expression-background)/background 
+# then e' = 0 if e'<0 or e'<1; 
+# this transformation is to scale the range for each gene so that all data fall into the same range and e' should still follow the positive constrain 
+# meanwhile using ratio between expression and background to filter non-expressed ones  
+####################
+expression = xx[, -c(1:2)]
+for(n in 1:ncol(expression)) 
+{
+  if(fitting.space == "linear"){
+    expression[,n] = (expression[,n]-xx$background)/xx$background
+    ## use the e'> 1 as a threshold 
+    expression[which(expression[,n]<1),n] = 0
+    #expression[which(expression<1)] = 0
+  }else{
+    expression[,n] = log2(expression[,n]/xx$background)
+  }
+}
+
+mm = match((enriched.list), rownames(expression))
+expression.sel = t(expression[mm, ])
+#expression.sel = log2(expression.sel)
+
+####################
+## match the sample order in the proprotion matrix and expression matrix 
+## now manually (to change)
+####################
+index.sel = c(13, 2, 1, 3, 6, 5, 7, 8, 9, 4, 10, 11)
+proportions.sel = proportions[index.sel, ]
+
+## double check the expression matrix
+if(fitting.space == 'linear') {logaxis = 'xy';
+}else{logaxis = ''}
+
+par(mfrow= c(1:2))
+plot(t(expression.sel[match(c("Dopaminergic", "Ciliated.sensory"), rownames(expression.sel)), ]), log=logaxis)
+abline(0, 1, lwd=2.0, col='red')
+plot(t(expression.sel[match(c("mechanosensory",  "unc.86.expressing"), rownames(expression.sel)), ]), log=logaxis)
+abline(0, 1, lwd=2.0, col='red')
 
 
 ######################################
@@ -30,6 +87,50 @@ fitting.space = "linear" ## linear or log2 transformed for expression matrix
 ## Section: process the table and run the glmnet
 ######################################
 ######################################
+require(glmnet)
+x=as.matrix(proportions.sel)
+y = as.matrix(expression.sel)
+
+x.ms = apply(x, 2, sum)
+x = x[, which(x.ms>0)]
+
+#x = x>0
+#y=cbind(y1,y2)
+#rownames(y) = res.sel$gene
+
+intercept=0
+standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
+standardize.response=FALSE
+alpha = 0.6
+grouped = FALSE
+
+cv.fit=cv.glmnet(x, y, family='mgaussian', grouped=grouped, alpha=alpha, nlambda=500, standardize=standardize, 
+                 standardize.response=standardize.response, intercept=intercept)
+par(mfrow= c(1,1))
+plot(cv.fit)
+
+#optimal = which(cv.fit$lambda==cv.fit$lambda.min)
+#optimal = which(cv.fit$lambda==cv.fit$lambda.1se)
+fit=glmnet(x,y, alpha=alpha, lambda=cv.fit$lambda,family='mgaussian', 
+           type.multinomial=c("ungrouped"), standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+
+#optimal = which(fit$df<=70)
+#optimal = max(optimal)
+optimal = which(cv.fit$lambda==cv.fit$lambda.min)
+
+## extract the fitting result
+#colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
+res = matrix(NA, nrow = ncol(x), ncol = ncol(y))
+colnames(res) = colnames(y)
+rownames(res) = colnames(x)
+for(n in 1:ncol(res))
+{
+  res[,n] = fit$beta[[n]][,optimal]
+}
+
+res = data.frame(res)
+
+cbind(rownames(res)[order(-res$lsy.6)],  res$lsy.6[order(-res$lsy.6)])
 
 
 
