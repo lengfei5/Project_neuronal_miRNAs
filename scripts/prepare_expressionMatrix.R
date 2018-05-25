@@ -1,117 +1,268 @@
-##################################################
-##################################################
-## Project: Chiara's neuron-specific miRNA expression 
-## Script purpose: to prepare the expression matrix in the deconvolution analysis and test the normalization using pi-RNAs
+##########################################################################
+##########################################################################
+## Project: Chiara's neuron class-specific miRNA expression  
+## Script purpose: to test piRNA normalization for the expression matrix in the decomvolution analysis
 ## Usage example: 
 ## Author: Jingkui Wang (jingkui.wang@imp.ac.at)
-## Date of creation: Tue May 15 17:50:26 2018
-##################################################
-##################################################
-find.neuronSamples.names = function(x)
-{
-  return(unlist(strsplit(as.character(x), "/"))[5])
-}
-find.neuronSamples.promoters = function(x)
-{
-  filename = unlist(strsplit(as.character(x), "/"))
-  return(unlist(strsplit(filename[length(filename)], "_"))[6])
-}
-
-dataDir = "../results/miRNAs_neurons_v1_2018_03_07/tables"
-version.analysis = "20180506"
-Save.Processed.Tables = TRUE
+## Date of creation: Wed May 16 13:58:52 2018
+##########################################################################
+##########################################################################
+RdataDir = paste0("../results/miRNAs_neurons_v1_2018_03_07/Rdata/")
+statDir = "../data/normalized_piRNAs"
+version.table = "miRNAs_neurons_v1_2018_03_07"
 resDir = "../results/tables_for_decomvolution"
 if(!dir.exists(resDir)) dir.create(resDir)
+Save.Processed.Tables = TRUE
 
-##################################################
-##################################################
-## Section: construct the matrix using the enrichment analysis
-# select the genes of interest: the ones showing enrichment in any of those samples
-# the cutoff should be considered and specified
-##################################################
-##################################################
-enrich.files = list.files(path = dataDir, pattern = paste0("*_Mature_miRNAs_neurons_v1_2018_03_07.csv"), full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
-jj = grep("ASE.neurons_henn1.mutant", enrich.files)
-enrich.files = enrich.files[-jj]
+######################################
+######################################
+## Section: load count tables for miRNAs and prepare statistics for piRNA and siRNAs for normalization
+######################################
+######################################
+load(file = paste0(RdataDir, 'Design_Raw_readCounts_', version.table, '.Rdata'))
+source("miRNAseq_functions.R")
 
-nsamples = sapply(enrich.files, find.neuronSamples.names, USE.NAMES = FALSE)
-promoters = sapply(enrich.files, find.neuronSamples.promoters, USE.NAMES = FALSE)
+Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
+Merge.techinical.replicates.N2 = TRUE
 
-####################
-## Construct the matrix using all samples (three promoters for pan-neurons (all henn1-mutant) and one ASE (WT) 
-####################
-enrich.matrix = NULL
-for(n in 1:length(enrich.files))
-{
-  test = read.csv(enrich.files[n], header = TRUE, row.names = 1)
-  if(n==1){
-    enrich.matrix = data.frame(test$log2FoldChange, test$pvalue)
-    rownames(enrich.matrix) = rownames(test)
-  }else{
-    mm = match(rownames(enrich.matrix), rownames(test))
-    enrich.matrix = data.frame(enrich.matrix, test$log2FoldChange[mm], test$pvalue[mm])
-  }
-  colnames(enrich.matrix)[c((2*n-1),2*n)] = paste0(nsamples[n], "_", promoters[n], "_", c('log2FC', 'pvalue'))
-}
+tcs = unique(design$tissue.cell)
+tcs = setdiff(tcs, c("whole.body"))
+length(tcs)
 
-## determine candidates of interest 
-## Log2 FC > 1 and p val< 0.01 for WT back; Log2 FC > 1 and p val< 0.001 for mutant
-fc.cutoff = 1; 
-pval.muant = 0.001;
-pval.wt = 0.01;
-
-candidates = rep(0, nrow(enrich.matrix))
-names(candidates) = rownames(enrich.matrix)
-for(n in 1:length(candidates))
-{
-  nb.enrich = 0
-  for(m in 1:length(nsamples))
+if(Merge.techinical.replicates.N2){
+  rep.technical = list(c("57751", "57753"), c("57752", "57754"))
+  for(n in 1:length(rep.technical))
   {
-    if(nsamples[m] == "Pan.neurons"){pval.cutoff = pval.muant;
-    }else{pval.cutoff = pval.wt}
+    index = c()
+    for(id in rep.technical[[n]])
+    {
+      #print(id)
+      index = c(index, which(design$SampleID==id))
+    }
     
-    if(enrich.matrix[n, (2*m-1)] >= fc.cutoff & enrich.matrix[n, 2*m]<pval.cutoff) nb.enrich = nb.enrich +1
+    design$SampleID[index[1]] = paste0(design$SampleID[index], collapse = ".")
+    ss = apply(all[, (index+1)], 1, function(x) sum(x, na.rm = TRUE))
+    all[, (index[1]+1)] = ss;
+    colnames(all)[(index[1]+1)] = paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  design$SampleID[index[1]])
+    design = design[-index[-1], ]
+    all = all[, -(index[-1]+1)]
   }
-  
-  cat(names(candidates)[n], "--", nb.enrich, '--fc.cutoff ', fc.cutoff, "--pval.cutoff ", pval.cutoff,  "\n")
-  
-  if(nb.enrich>0) candidates[n] = 1
+} 
+
+# filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
+if(Filter.lowly.expressed.using.predefined.miRNA.list){
+  list.expressed = read.csv(paste0("../data/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
+  # prepare old llist
+  list.expressed = find.mature.ones.for.expressed.miRNAs(list.expressed)
+  expressed.miRNAs = data.frame(list.expressed[, c(1:3)], stringsAsFactors = FALSE)
 }
 
-##
-## concatenate Pan-neurons
-pan.ns = as.matrix(enrich.matrix[, grep("Pan.neurons", colnames(enrich.matrix))])
-pan.ns.cat = data.frame(apply(pan.ns[, grep('_log2FC', colnames(pan.ns))], 1, mean), 
-                        apply(pan.ns[, grep('_pvalue', colnames(pan.ns))], 1, min))
-colnames(pan.ns.cat) = paste0('Pan.neurons_rab.3.rgef.1.unc.31', c('_log2FC', "_pvalue"))
-enrich.matrix = data.frame(pan.ns.cat, enrich.matrix[, grep("Pan.neurons", colnames(enrich.matrix), invert = TRUE)])
+####################
+## calculate cpm and select only expressed miRNAs and start to use the gene names instead of arms 
+####################
+raw = as.matrix(all[, -1])
+raw[which(is.na(raw))] = 0
+raw = floor(raw)
+rownames(raw) = all$gene
+library.sizes = apply(raw, 2, sum)
 
-enrich.matrix.sel = t(enrich.matrix[which(candidates>0), grep('_log2FC', colnames(enrich.matrix))])
+#cpm = my.cpm.normalization(raw)
+
+expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
+mm = match(expressed.miRNAs$miRNA, all$gene)
+countData = raw[mm, ]
+rownames(countData) = expressed.miRNAs$gene
+
+## filter the samples unrelevant (non-neuron samples, henn1-mutant background)
+kk = which(design$tissue.cell=="Glial.cells" | design$tissue.cell == "CEPsh" | design$genotype == "henn1.mutant")
+if(length(kk)>0){
+  design.matrix = design[-kk, ]
+  countData = countData[, -kk]
+  library.sizes = library.sizes[-kk]
+}
+
+######################################
+######################################
+## Section: calculate scaling factors using piRNAs or siRNAs and scale cpm using them and test if it works
+######################################
+######################################
+stat.list = list.files(path = statDir, pattern = "*_cnt.typeHierarchy.txt", full.names = TRUE)
+stats = NULL;
+for(n in 1:length(stat.list))
+{
+  if(n ==1){
+    stats = read.table(stat.list[n], sep = "\t", header=TRUE)
+  }else{
+    test = read.table(stat.list[n], sep = "\t", header=TRUE)
+    stats = data.frame(stats, test[, -1])
+  }
+}
+stats = stats[which(!is.na(stats$type)==TRUE), ]
+rownames(stats) = stats[, 1]
+stats = stats[, -1]
+
+colnames(stats) = sapply(colnames(stats), function(x) gsub('count.', '', x), USE.NAMES = FALSE)
+
+## need to merge again the techinical replicates for N2
+if(Merge.techinical.replicates.N2){
+  rep.technical = list(c("57751", "57753"), c("57752", "57754"))
+  for(n in 1:length(rep.technical))
+  {
+    index = c()
+    for(id in rep.technical[[n]])
+    {
+      #print(id)
+      index = c(index, which(colnames(stats)==id))
+    }
+    
+    #design$SampleID[index[1]] = paste0(design$SampleID[index], collapse = ".")
+    ss = apply(stats[, index], 1, function(x) sum(x, na.rm = TRUE))
+    stats[, (index[1])] = ss;
+    colnames(stats)[index[1]] = paste0(colnames(stats)[index], collapse = ".")
+      #paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  design$SampleID[index[1]])
+    #design = design[-index[-1], ]
+    stats = stats[, -index[-1]]
+  }
+} 
+
+mm = match(design.matrix$SampleID, colnames(stats))
+
+stats = stats[, mm]
+colnames(stats) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
+stats = data.frame(t(stats))
+
+source('RNAseq_Quality_Controls.R')
+#pairs(stats, lower.panel=NULL, upper.panel=panel.fitting)
+
+plot(library.sizes, stats$piRNA, log = 'xy')
+plot(library.sizes, stats$siRNA, log = 'xy')
+
+lims =  range(c(stats$piRNA, stats$siRNA))
+plot(stats$piRNA, stats$siRNA, log='xy', ylim =lims, xlim = lims)
+#abline(log(mean(stats$siRNA/stats$piRNA)),  lwd=2.0, col='red')
 
 ####################
-## save the enrichment matrix 
+## Normalize the data using piRNAs 
 ####################
+#sizefactors.piRNA = stats$piRNA/median(stats$piRNA) 
+#sizefactors.siRNA = stats$siRNA/median(stats$siRNA)
+#sizefactors = (sizefactors.piRNA + sizefactors.siRNA) /2
+sizefactors = stats$piRNA;
+cpm.piRNA = countData
+for(n in 1:ncol(cpm.piRNA))
+{
+  cpm.piRNA[,n] = countData[,n]/sizefactors[n]*10^6
+}
+
+save(stats, countData, design.matrix, cpm.piRNA, file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
+
+######################################
+######################################
+## Section: remove batch effects and check the expression matrix
+######################################
+######################################
+load(file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
+
+source("miRNAseq_functions.R")
+design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4))
+#method.sel = 'linear.model'
+## remove batch effect by scaling the untreated samples using N2 as the reference
+cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'linear.model')
+cpm.piRNA.bc.limma = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'limma')
+cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'combat')
+
+pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval", ".pdf")
+pdf(pdfname, width=16, height = 10)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+#par(mfrow=c(1, 1))
+# par(mfcol=c(1, 1))
+source("miRNAseq_functions.R")
+
+Test.piRNA.normalization.batch.removal(cpm.piRNA, design.matrix)
+Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
+Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.limma, design.matrix)
+Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.combat, design.matrix)
+
+dev.off()
+
+####################
+## Here we decided to use the piRNA normalization and correct the batch using ComBat 
+####################
+## average the biological replicates
+cpm.piRNA.bc = cpm.piRNA.bc.combat
+source("miRNAseq_functions.R")
+cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+
+save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, design.matrix, 
+     file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
+### test if normalization and batch removal works
+#cpm.piRNA.batch.corrected[which(rownames(cpm.piRNA.batch.corrected)=='lsy-6'), grep('treated', colnames(cpm.piRNA.batch.corrected))]
+
+######################################
+######################################
+## Section: save the tables and check the expression matrix 
+######################################
+######################################
+load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
+jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
+total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
+xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
+ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+
+colnames(xx) = c('whole.body', 'background', ncs)
+
+## substract the background, namely the N2 in treated treatment
+#kk = grep('_treated', colnames(cpm.piRNA.bc.meanrep))
+#index.N2 = intersect(grep('N2', colnames(cpm.piRNA.bc.meanrep)), kk)
+expression = xx[, -c(1:2)]
+for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
+#expression = cpm.piRNA.bc.meanrep[, setdiff(kk, index.N2)] - cpm.piRNA.bc.meanrep[, index.N2]   
+#expression[which(expression<0)] = 0
+
+enriched.list = read.table(file = paste0(resDir, "/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
+                           sep = "\t", header = TRUE, row.names = 1)
+enriched.list = colnames(enriched.list)
+enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
+mm = match((enriched.list), rownames(expression))
+
+expression.sel = t(expression[mm, ])
+expression.sel = log2(expression.sel)
 library("pheatmap")
 library("RColorBrewer")
 
-pdfname = paste0(resDir, "/heatmap_for_13samples_66genes_with_clusters_for_neuronClasses", ".pdf")
-pdf(pdfname, width=16, height = 6)
+pdfname = paste0(resDir, "/heatmap_ExpreMatrix_piRNAnormalization_for_12samples_66genes_with_clusters_for_neuronClasses", ".pdf")
+pdf(pdfname, width=14, height = 6)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
 # par(mfcol=c(1, 1))
 
-pheatmap(enrich.matrix.sel, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+pheatmap(expression.sel, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE, 
          cluster_cols=TRUE, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+
+#expression.sel = data.frame(t(expression.sel))
+par(mfrow= c(1:2))
+plot(t(expression.sel[match(c("Dopaminergic", "Ciliated.sensory"), rownames(expression.sel)), ]), log='')
+abline(0, 1, lwd=2.0, col='red')
+
+plot(t(expression.sel[match(c("mechanosensory",  "unc.86.expressing"), rownames(expression.sel)), ]), log='')
+abline(0, 1, lwd=2.0, col='red')
 
 dev.off()
 
 if(Save.Processed.Tables)
 {
-  write.table(enrich.matrix.sel, file = paste0(resDir, "/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
+  write.table(expression.sel, file = paste0(resDir, "/Expression_Matrix_select_12samples_66genes_with_clusters_for_neuronClasses.txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
-  write.table(enrich.matrix, file = paste0(resDir, "/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses.txt"), 
+  
+  write.table(expression, file = paste0(resDir, "/Expression_Matrix_select_12samples_allgenes_with_clusters_for_neuronClasses.txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
+  write.table(xx, 
+              file = paste0(resDir, "/Expression_Matrix_piRNA_normalization_average_replicates_remove_batch_allgenes_N2_background_12samples.txt"), 
+              sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
+  
 }
 
 
