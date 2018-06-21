@@ -40,7 +40,7 @@ return(paste0(test[-c(1,length(test))], collapse = '-'))
 version.Data = 'miRNAs_neurons_v1';
 version.analysis = paste0(version.Data, "_2018_03_07")
 
-### Directories to save results 
+### Directories to save results
 design.file = "../exp_design/Neuron_project_design_all_v1.xlsx"
 dataDir = "../data"
 resDir = paste0("../results/", version.analysis)
