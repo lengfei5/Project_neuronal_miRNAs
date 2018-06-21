@@ -266,5 +266,37 @@ if(Save.Processed.Tables)
 }
 
 
+######################################
+######################################
+## Section: calculate pvalue for overlapping groups
+######################################
+######################################
+calculate.pval.for.overlapping.groups = FALSE
+if(calculate.pval.for.overlapping.groups){
+  
+  library(openxlsx)
+  aa = read.xlsx("../results/decomvolution_results/pvalue_overlapping_groups.xlsx", sheet = 2, colNames = TRUE, detectDates = TRUE)
+  aa = aa[which(!is.na(aa[, 1])==TRUE), ] 
+  aa = data.frame(aa)
+  aa$TOTAL.NUMBER.OF.EXPRESSED.miRNAs = 123
+  
+  aa = aa[, c(1:5)]
+  source("miRNAseq_functions.R")
+  xx = c()  
+  for(n in 1:nrow(aa))
+  {
+    #n = 1
+    xx = rbind(xx, calculate.pvalues.two.groups.overlapping(aa$TOTAL.NUMBER.OF.EXPRESSED.miRNAs[n], 
+                                                            aa$groupA[n],
+                                                            aa$groupB[n], 
+                                                            aa$OVERLAP[n]))
+  }
+  
+  aa = data.frame(aa, observersion.expected=xx[,1], pval=xx[, 2], stringsAsFactors = FALSE)
+  write.xlsx(aa, file='..//results/decomvolution_results/pvalue_overlapping_groups_byJingkui.xlsx')
+  
+}
+
+
 
 

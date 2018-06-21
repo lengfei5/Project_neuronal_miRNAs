@@ -30,6 +30,47 @@ process.countTable = function(all, design, select.Total.count = TRUE)
   return(newall)
 }
 
+process.countTable.v1 = function(all, design) ## old version of process.countTable function
+{
+  index = c()
+  for(n in 1:nrow(design))
+  {
+    #n = 1;
+    jj = intersect(grep(design$SampleID[n], colnames(all)), grep("Total.count", colnames(all)));
+    if(length(jj)==1) {
+      index = c(index,jj)
+    }else{print(paste0("ERROR for sample--", design$SampleID[n]))}
+  }
+  
+  newall = data.frame(as.character(all[,1]),  as.matrix(all[, index]), stringsAsFactors = FALSE)
+  colnames(newall)[1] = "gene";
+  colnames(newall)[-1] = paste0(design$genotype, "_", design$tissue.cell, "_", design$SampleID)
+  
+  return(newall)
+}
+
+cat.countTable = function(xlist)
+{
+  ## input is list.files for count tables (including directories and file names)
+  counts = NULL
+  for(n in 1:length(xlist)){
+    # n = 1
+    ff = read.delim(xlist[n], sep='\t', header = TRUE, as.is = c(1));
+    if(n==1){
+      ggs = unique(ff[, 1]);
+      counts = data.frame(ggs, ff[match(ggs, ff[, 1]) , -1], stringsAsFactors = FALSE);
+    }else{
+      ggs = unique(c(counts[, 1],ff[, 1]));
+      counts = data.frame(ggs, counts[match(ggs, counts[, 1]), -1], ff[match(ggs, ff[, 1]) , -1], stringsAsFactors = FALSE);
+    }
+  };
+  
+  colnames(counts)[1] = 'gene'
+  return(counts)
+  
+}
+
+
 find.mirName = function(x)
 {
   test = unlist(strsplit(as.character(x), '-'));
@@ -254,45 +295,6 @@ Check.3p.5p.arm.switch = function(all)
   length(which(counts.ps[mm,1]==0 | counts.ps[mm,3]==0))
 }
 
-process.countTable = function(all, design)
-{
-  index = c()
-  for(n in 1:nrow(design))
-  {
-    #n = 1;
-    jj = intersect(grep(design$SampleID[n], colnames(all)), grep("Total.count", colnames(all)));
-    if(length(jj)==1) {
-      index = c(index,jj)
-    }else{print(paste0("ERROR for sample--", design$SampleID[n]))}
-  }
-  
-  newall = data.frame(as.character(all[,1]),  as.matrix(all[, index]), stringsAsFactors = FALSE)
-  colnames(newall)[1] = "gene";
-  colnames(newall)[-1] = paste0(design$genotype, "_", design$tissue.cell, "_", design$SampleID)
-  
-  return(newall)
-}
-
-cat.countTable = function(xlist)
-{
-  ## input is list.files for count tables (including directories and file names)
-  counts = NULL
-  for(n in 1:length(xlist)){
-    # n = 1
-    ff = read.delim(xlist[n], sep='\t', header = TRUE, as.is = c(1));
-    if(n==1){
-      ggs = unique(ff[, 1]);
-      counts = data.frame(ggs, ff[match(ggs, ff[, 1]) , -1], stringsAsFactors = FALSE);
-    }else{
-      ggs = unique(c(counts[, 1],ff[, 1]));
-      counts = data.frame(ggs, counts[match(ggs, counts[, 1]), -1], ff[match(ggs, ff[, 1]) , -1], stringsAsFactors = FALSE);
-    }
-  };
-  
-  colnames(counts)[1] = 'gene'
-  return(counts)
-  
-}
 
 Compare.total.median.normalization = function()
 {
@@ -339,12 +341,14 @@ my.cpm.normalization = function(countData)
   return(cpm)
 }
 
-calculate.scaling.factors.using.spikeIns = function(countData, concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250),index.spikeIn=c(1:8), read.threshold=5, 
-                                                    method="Ratio", plot.concentration.vs.cpm = TRUE)
+calculate.scaling.factors.using.spikeIns = function(countData, concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250),
+                                                    index.spikeIn=c(1:8), read.threshold=5, 
+                                                    method="Ratio", plot.spikeIns.summary = TRUE)
 {
   # counData = raw;
   if(method == "Ratio"){
     ss = apply(as.matrix(countData), 2, sum);
+    ss.spikeIns = apply(as.matrix(countData[index.spikeIn, ]), 2, sum)
     cpm = my.cpm.normalization(countData)
     cpm.spikeIn = cpm[index.spikeIn, ]
     res = matrix(NA, ncol = ncol(cpm), nrow = nrow(cpm))
@@ -364,10 +368,14 @@ calculate.scaling.factors.using.spikeIns = function(countData, concentrations = 
         scaling.factors[n] = median((concentrations[jj]) / (cpm.spikeIn[jj, n])); 
         res[,n] = cpm[,n]*scaling.factors[n];
         
-        if(plot.concentration.vs.cpm){
+        if(plot.spikeIns.summary){
+          
+          pie(c(ss.spikeIns[n], (ss[n]-ss.spikeIns[n])),labels = c('spikeIns', 'non-spikeIns'), 
+              col=c('red', 'blue'), main=colnames(cpm)[n]) 
+          
           #kk = grep("spikeIn", rownames(cpm))
           plot((cpm.spikeIn[, n]+10^-6),  concentrations, log='xy', 
-               xlab="cpm", ylab="molecular per mug", main=paste0(colnames(cpm)[n], '--', signif(scaling.factors[n], d=2)), cex=3.0, col='darkgreen', pch= 16);
+               xlab="cpm", ylab="molecular per mug", main=paste0(colnames(cpm)[n], '--scalingFactor : ', signif(scaling.factors[n], d=2)), cex=3.0, col='darkgreen', pch= 16);
           abline(h=10^-6, lwd=2.0, col='darkgray')
           points(range((cpm.spikeIn[, n]+10^-6)), range((cpm.spikeIn[, n]+10^-6))*scaling.factors[n], type = 'l', lwd=3.0, col='darkblue', lty=1)
         }
@@ -719,4 +727,18 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
   abline(0, 1, lwd=2.0, col='red')
   
 }
+
+calculate.pvalues.two.groups.overlapping = function(nb.total, nb.group.A, nb.group.B, nb.overlapping)
+{
+  total = as.numeric(nb.total)
+  q = as.numeric(nb.overlapping)
+  m = as.numeric(nb.group.A)
+  nn = total - m;
+  k = as.numeric(nb.group.B)
+  rr = q/(k*m/total)
+  pvals = phyper((q-1), m, nn, k, lower.tail = FALSE, log.p = FALSE)
+  
+  return(c(rr, pvals))
+}
+
 

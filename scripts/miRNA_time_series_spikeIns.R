@@ -9,17 +9,18 @@
 ##################################################
 library("openxlsx")
 require('DESeq2')
+source('miRNAseq_functions.R')
 
 ### data verision and analysis version   
 version.Data = 'miRNAs_timeSeries_spikeIn_R5922_R6016';
-version.analysis = paste0("_", version.Data, "_20180503")
+version.analysis = paste0("_", version.Data, "_20180620")
 
 ### Directories to save results 
 design.file = "../exp_design/Libaries_time_series_spikIns.xlsx"
 dataDir = "../data/timeSeries_withSpikIns"
 
-data.file = paste0(dataDir, "countTable.txt")
-spikes.file = paste0(dataDir, "spikeIns_count_table.txt")
+#data.file = paste0(dataDir, "countTable.txt")
+#spikes.file = paste0(dataDir, "spikeIns_count_table.txt")
 
 resDir = "../results/time_series"
 tabDir =  paste0(resDir, "/tables/")
@@ -34,7 +35,6 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 ## Section: import design matrix and prepare count table
 ##################################################
 ##################################################
-library("openxlsx")
 design = read.xlsx(design.file, sheet = 1, colNames = TRUE)
 #design = design[which(design$stage != "L1.early"),]
 
@@ -55,6 +55,7 @@ if(Processing.design.matrix){
 ## make the data table
 xlist<-list.files(path=paste0(dataDir), pattern = "*.txt", full.names = TRUE) ## list of data set to merge
 spikes.file = xlist[grep("spikeIns_", xlist)]
+spikes.file = spikes.file[grep("_old", spikes.file, invert = TRUE)]
 xlist = xlist[grep("cel_", xlist)]
 
 if(length(xlist)>1){
@@ -144,12 +145,21 @@ dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ tr
 #dds$genotype <- relevel(dds$genotype, ref="WT");
 #dds$treatment = relevel(dds$treatment, ref="untreated");
 index.spikeIn = grep("spikeIn", rownames(dds))
-concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)
+concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
 
 ## calculate scaling factor using spike-ins
 source("miRNAseq_functions.R")
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+
+par(mfrow=c(2,2))
 #norms = calculate.scaling.factors.using.spikeIns(dds, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
-res.spike.in = calculate.scaling.factors.using.spikeIns(counts(dds), concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+res.spike.in = calculate.scaling.factors.using.spikeIns(counts(dds), 
+                                                        concentrations = concentrations, 
+                                                        index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
 norms = res.spike.in$norms4DESeq2;
 sizeFactors(dds) = res.spike.in$norms4DESeq2
 
@@ -157,25 +167,12 @@ res = fpm(dds, robust = TRUE)
 cpm =  fpm(dds, robust = FALSE)
 kk = grep("spikeIn", rownames(cpm))
 
-pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 10)
-
-par(mfrow=c(2,2))
-for(n in 1:ncol(cpm))
-{
-  plot((cpm[kk, n]+10^-6),  concentrations, log='xy', 
-       xlab="cpm", ylab="zmol", main=colnames(cpm)[n], cex=3.0, col='darkgreen', pch= 16);
-  abline(h=10^-6, lwd=2.0, col='darkgray')
-  points(range((cpm[kk, n]+10^-6)), range((cpm[kk, n]+10^-6))/norms[n], type = 'l', lwd=3.0, col='darkblue', lty=1)
-}
-
-dev.off()
-
 index.qc = c(1, 3,4)
 source("RNAseq_Quality_Controls.R")
 pdfname = paste0(resDir, "/Data_qulity_assessment_all_samples_withSpikeIns", version.analysis, ".pdf")
 pdf(pdfname, width = 12, height = 10)
 Check.RNAseq.Quality(read.count=countData, design.matrix = design.matrix[, index.qc], norms = norms)
+
 dev.off()
 
 #write.table(res, file = paste0(tabDir, "normalized_signals_using_preliminary_scalling_factors_spike_ins.txt"), 
@@ -184,7 +181,7 @@ dev.off()
 ####################
 ## make a plot for enriched miRNAs
 ####################
-list.enriched = read.csv("../results/miRNAs_neurons_v1_2018_03_07/Pan.neurons/miRNA_Enrichment_Analysis_Pan.neurons_henn1.mutant_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv", 
+list.enriched = read.csv("../results/miRNAs_neurons_v1_2018_03_07/tables/Pan.neurons/miRNA_Enrichment_Analysis_Pan.neurons_henn1.mutant_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv", 
                          header = TRUE, row.names = 1)
 list.enriched = list.enriched[order(-list.enriched$log2FoldChange), ]
 
@@ -198,9 +195,8 @@ for(n in 1:nrow(list.enriched))
   jj = grep(rownames(list.enriched)[n], rownames(res))
   #test = res[jj, ]
   
-  
   #index = 1
-  #lty = 1
+  lty = 1
   if(length(jj)>1){
     index.untreated = grep("_untreated", colnames(res))
     ss.untreated = c()
@@ -282,7 +278,6 @@ if(Filter.lowly.expressed.using.predefined.miRNA.list){
   index2add = which(!is.na(mm))
   expressed.miRNAs = data.frame(rbind(new.list, old.list[index2add, ]), stringsAsFactors = FALSE)
   expressed.miRNAs$mature = expressed.miRNAs$mature>0
-  
 }
 
 ####################
@@ -313,7 +308,7 @@ for(n in 1:length(tcs))
   rownames(raw) = all$gene
   
   ## save plots for enrichment analysis
-  pdfname = paste0(specDir, "QCs_assessment_Enrichment_analysis_", specifity, ".pdf") #save all plots during data processing
+  pdfname = paste0(specDir, "QCs_assessment_Enrichment_analysis_", specifity, "_", version.analysis, ".pdf") #save all plots during data processing
   pdf(pdfname, width = 12, height = 8)
   par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
   
@@ -457,8 +452,8 @@ raw = floor(as.matrix(read.count[,sel.samples.with.spikeIns]))
 raw[which(is.na(raw))] = 0
 rownames(raw) = all$gene
 #dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ treatment + stage)
-index.spikeIn = grep("spikeIn", rownames(dds))
-concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)
+index.spikeIn = grep("spikeIn", rownames(raw))
+concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
 
 ## calculate scaling factor using spike-ins
 source("miRNAseq_functions.R")
