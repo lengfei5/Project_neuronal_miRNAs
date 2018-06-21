@@ -110,7 +110,31 @@ save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analys
 ## Section: check data quality and spike-in quality
 ##################################################
 ##################################################
+Compare.spikeIns.old.vs.new = FALSE
+if(Compare.spikeIns.old.vs.new)
+{
+  version.analysis.old = "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180503"
+  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis.old, '.Rdata'))
+  old = all[c(1:8), -c(1:5)]
+  
+  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+  new = all[c(1:8), -c(1:5)]
+  
+  pdfname = paste0(resDir, "/SpikeIns_comparison_new_vs_old", version.analysis, ".pdf")
+  pdf(pdfname, width = 16, height = 16)
+  
+  par(mfrow=c(4,4))
+  for(n in 1:ncol(new))
+  {
+    plot(old[,n]+0.5, new[, n], type='p', cex=2.0, pch=16, log='xy', col= 'darkblue', xlab='spikeIn read counts (old)', ylab='spikeIn read counts (new)')
+    abline(0, median(new[,n]/old[,n]), lwd=2.0, col='red', untf = TRUE)
+  }
+  
+  dev.off()
+}
+
 load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+
 read.count = all[, -1];
 
 kk = c(1:nrow(design))
@@ -295,12 +319,6 @@ for(n in 1:length(tcs))
   
   kk = which(design$stage==specifity)
   
-  # find genome types and promoters
-  #genos = unique(design$genotype[kk]);
-  #promoters = unique(design$promoter[kk]); 
-  
-  #if(any(genos=='WT') & specifity != "whole.body") {kk = unique(c(kk, index.N2));}
-  
   design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
   raw = as.matrix(read.count[,kk])
   raw[which(is.na(raw))] = 0
@@ -480,8 +498,8 @@ plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
 #plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
 res = data.frame(res, cpm)
 
-#write.table(res, file = paste0(tabDir, "normalized_signals_scalling.factors_using_spikeIns_corrected.txt"), 
-#            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
+write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns_corrected", version.analysis, ".txt")), 
+            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
 
 
 ####################
