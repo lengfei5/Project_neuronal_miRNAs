@@ -56,12 +56,13 @@ if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 ##################################################
 ##################################################
 library("openxlsx")
-design = read.xlsx(design.file, sheet = 1, colNames = TRUE)
+design = read.xlsx(design.file, sheet = 1, colNames = TRUE, skipEmptyRows = TRUE, skipEmptyCols = TRUE)
 
 Processing.design.matrix = TRUE
 if(Processing.design.matrix){
   xx = design;
-  design = data.frame(xx$sample.ID, as.character(xx$genotype), xx$`Tissue/.Cell-type`, xx$promoter, xx$sampleInfo, xx$sampleInfo, stringsAsFactors = FALSE)
+  design = data.frame(xx$sample.ID, as.character(xx$genotype), xx$`Tissue/.Cell-type`, xx$promoter, xx$sampleInfo, xx$sampleInfo, 
+                      stringsAsFactors = FALSE)
   colnames(design) = c('SampleID', 'genotype', 'tissue.cell', 'promoter', 'treatment', 'sampleInfo')
   
   kk = grep("No Treatment|No treatment", design$treatment)
@@ -95,7 +96,7 @@ if(length(xlist)>1){
     }else{
       ggs = ff[,1];
       gg.union = unique(union(all$gene, ggs))
-      all = data.frame(gg.union, 
+      all = data.frame(gg.union,
                        all[match(gg.union, all$gene), -1],
                        ff[match(gg.union, ggs), -1], 
                        stringsAsFactors = FALSE)
@@ -116,65 +117,34 @@ save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analys
 ##################################################
 ##################################################
 load(file = paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+source("miRNAseq_functions.R")
 
-Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
+Filter.lowly.expressed.using.predefined.miRNA.list = FALSE;
+Filter.lowly.expressed.using.cpm.threshold = TRUE;
 Merge.techinical.replicates.N2 = TRUE
 
 tcs = unique(design$tissue.cell)
-tcs = setdiff(tcs, c("whole.body"))
+tcs = setdiff(tcs, c("whole.body", "whole.body.L3"))
 length(tcs)
 
 if(Merge.techinical.replicates.N2){
-  rep.technical = list(c("57751", "57753"), c("57752", "57754"))
-  for(n in 1:length(rep.technical))
-  {
-    index = c()
-    for(id in rep.technical[[n]])
-    {
-      #print(id)
-      index = c(index, which(design$SampleID==id))
-    }
-   
-    design$SampleID[index[1]] = paste0(design$SampleID[index], collapse = ".")
-    ss = apply(all[, (index+1)], 1, function(x) sum(x, na.rm = TRUE))
-    all[, (index[1]+1)] = ss;
-    colnames(all)[(index[1]+1)] = paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  design$SampleID[index[1]])
-    design = design[-index[-1], ]
-    all = all[, -(index[-1]+1)]
-  }
+  rep.technical = list(c("57751", "57753"), c("57752", "57754"), c("66867", "66869"), c("66868", "66870"))
+  res.merged = Merge.techinical.replicates.using.design.countTable(design, all, id.list=rep.technical);
+  all = res.merged$countTable
+  design = res.merged$design
 } 
 
 # filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
 if(Filter.lowly.expressed.using.predefined.miRNA.list){
-  list.expressed = read.csv(paste0(dataDir, "/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
-  colnames(list.expressed)[c(1,2)] = c("miRNA", "gene")
-  list.expressed = list.expressed[order(list.expressed$miRNA), ]
-  ggs.uniq = unique(list.expressed$gene)
-  
-  mature = rep(NA, nrow(list.expressed))
-  kk = grep('.cpm', colnames(list.expressed))
-  for(n in 1:length(ggs.uniq))
-  {
-    jj = which(list.expressed$gene==ggs.uniq[n])
-    if(length(jj)>1){
-      index.max = apply(list.expressed[jj, kk], 2, which.max)
-      nb.first.max = length(which(index.max==1))
-      nb.sec.max = length(which(index.max==2))
-      #cat(n, ": ", as.character(ggs.uniq[n]), "--",  nb.first.max, "--", nb.sec.max, "\n")
-      if(nb.first.max>nb.sec.max){
-        mature[jj[1]] = TRUE; mature[jj[2]] = FALSE;  
-      }else{
-        mature[jj[1]] = FALSE; mature[jj[2]] = TRUE; 
-      }
-    }else{
-      #cat(n,": ", as.character(ggs.uniq[n]),  "-- no selection \t")
-      mature[jj] = TRUE;
-    }
-  }
-  expressed.miRNAs = data.frame((list.expressed[, c(1, 2)]), mature=(mature), list.expressed[, -c(1:2)], stringsAsFactors = FALSE)
+  list.expressed = read.csv(paste0(dataDir, "/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), 
+                            header = TRUE, as.is = c(1, 2))
+  expressed.miRNAs = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
 }
 
-
+if(Filter.lowly.expressed.using.cpm.threshold){ # filter the non-expressed miRNAs using cpm threshold
+  kk = intersect(grep("L3", design$tissue.cell), which(design$treatment=='untreated'))
+  expressed.miRNAs = identify.expressed.miRNAs.using.cpm.threshold(all[, (kk+1)], cpm.threshold=10)   
+}
 ####################
 ## Enrichment Analysis for each neuron class 
 ####################
@@ -187,14 +157,19 @@ Save.Comparison = TRUE
 Check.data.quality = TRUE
 
 #for(n in 1:length(tcs))
-for(n in 14:15)
+for(n in c(16))
 {
-  # n = 2
+  # n = 16
   specifity = tcs[n];
+
   specDir = paste0(resDir, "/", specifity, "/")
   if(!dir.exists(specDir)){dir.create(specDir)}
   
   kk = which(design$tissue.cell==specifity)
+  
+  if(specifity == "CEPsh.L3"){
+    index.N2 = which(design$genotype=="WT" & design$tissue.cell == "whole.body.L3")
+  }
   
   # find genome types and promoters
   genos = unique(design$genotype[kk]);
@@ -206,6 +181,10 @@ for(n in 14:15)
   }
   
   design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
+  if(specifity == "CEPsh.L3"){
+    design.matrix$genotype[which(design.matrix$tissue.cell=="whole.body.L3")] = "N2"
+  }
+  
   raw = as.matrix(read.count[,kk])
   raw[which(is.na(raw))] = 0
   raw = floor(raw)
@@ -230,12 +209,10 @@ for(n in 14:15)
     }
   }
   
-  
   source("RNAseq_Quality_Controls.R")
-  if(Check.data.quality){
-    Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix.QC)
-  }
+  if(Check.data.quality){ Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix.QC);}
   
+  #dev.off()
   
   ## enrichment analysis is done with samples with the same genotype and promoter
   for(cc in genos)
@@ -256,25 +233,24 @@ for(n in 14:15)
           dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix[jj, ]), design = ~ genotype + treatment + genotype:treatment)
           dds$genotype <- relevel(dds$genotype, ref="WT");
           dds$treatment = relevel(dds$treatment, ref="untreated");
-          
         }else{
           dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix[jj, ]), design = ~ treatment )
         }
         
         cpm0 = fpm(dds, robust = FALSE)
+        
         ## filter lowly expressed miRNA first before estimating scaling factor and dispersion parameters
-        if(Filter.lowly.expressed.using.predefined.miRNA.list){
-          jj.expressed = NULL
-          jj.expressed = match(rownames(dds), expressed.miRNAs$miRNA)
-          sels = !is.na(jj.expressed)
-          cat("nb of expressed miRNAs --", sum(sels), "\n")
-          dds = dds[sels, ]
-          index.sel = jj.expressed[sels]
-          jj.mature = expressed.miRNAs$mature[index.sel]
-          rownames(dds)[jj.mature] = expressed.miRNAs$gene[index.sel[jj.mature]]
-          cpm0 = cpm0[sels, ]
-          
-        }else{sels = c(1:nrow(dds));  dds = dds[sels, ]; } # without filtering
+        jj.expressed = NULL
+        jj.expressed = match(rownames(dds), expressed.miRNAs$miRNA)
+        sels = !is.na(jj.expressed)
+        cat("nb of expressed miRNAs --", sum(sels), "\n")
+        dds = dds[sels, ]
+        index.sel = jj.expressed[sels]
+        jj.mature = expressed.miRNAs$mature[index.sel]
+        rownames(dds)[jj.mature] = expressed.miRNAs$gene[index.sel[jj.mature]]
+        cpm0 = cpm0[sels, ]
+        
+            
         #cat("size factor is -- ", sizeFactors(dds), "\n")
         
         ## estimate scaling factor and dispersion parameter
@@ -320,7 +296,8 @@ for(n in 14:15)
           ## merge both res1 and res2
           res1 = as.data.frame(res); 
           res2 = as.data.frame(res2);
-          res2$log2FoldChange = -res2$log2FoldChange; ## change the sign (log2(FC.WT.treated) - log2(FC.WT.untreated)) - (log2(FC.N2.treated) - log2(FC.N2.untreated))
+          ## change the sign (log2(FC.WT.treated) - log2(FC.WT.untreated)) - (log2(FC.N2.treated) - log2(FC.N2.untreated))
+          res2$log2FoldChange = -res2$log2FoldChange; 
           ii.enrich = which(res1$log2FoldChange>0) 
           res1[ii.enrich, ] = res2[ii.enrich, ] ## replaced by res2 if enriched; keep if depleted
           
@@ -334,7 +311,8 @@ for(n in 14:15)
         }
         
         kk.mature = grep("cel-",rownames(res), invert = TRUE)
-        plot(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), xlab='log2(FoldChange)', ylab='-log10(pvalue)', cex=0.8, main=paste0(cc, "--", prot))
+        plot(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), xlab='log2(FoldChange)', ylab='-log10(pvalue)', 
+             cex=0.8, main=paste0(cc, "--", prot))
         abline(v=seq(-1, 1, by=0.5), lwd=1.0, col='gray')
         abline(h=c(3, 5, 10), lwd=1.0, lty=2, col='blue')
         text(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), rownames(res)[kk.mature], cex=1.0, offset = 0.3, pos = 3)
