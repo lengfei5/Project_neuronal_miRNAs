@@ -416,57 +416,60 @@ Merge.techinical.replicates.using.design.countTable = function(design, all, id.l
 ## Section: functions to identify expressed miRNAs and also mature arms for those expressed miRNAs
 ######################################
 ######################################
-find.expressed.mature.miRNA.for.dm = function(dds, cpm.threshold=10, sampletoUse="untreated")
+find.expressed.mature.miRNA.using.cpm.threshold = function(countData, cpm.threshold=10, species = 'cel')
 {
-  ## sampletoUse can be "untreated", "treated", "all", "untreated.or.treated"
-  require('DESeq2')
-  # dds = dds_all
-  #index.test = c(294, 332)
+  #############################
+  ## here we are not using DESeq2 to calculate the cpm  
+  ## we are using the countData to calculate the mean and then determine if they are expressed or not 
+  #############################
+  # countData = all[, (kk+1)]; cpm.threshold=10; species = "cel";
+  raw = as.matrix(countData)
+  raw[which(is.na(raw))] = 0
+  cpm = my.cpm.normalization(raw)
+  colnames(cpm) = paste0(colnames(cpm), '.cpm')
   ## filter lowly expressed miRNAs using cpm=10 and select the mature arms always baesed on the untreated samples
-  cpm = fpm(dds, robust = FALSE)
-  colnames(cpm) = paste0("diluation_", colnames(cpm), '.cpm')
-  ggs = sapply(rownames(cpm), find.mirName.dm)
-  cpm.untreated = cpm[, which(dds$treatment=="untreated")]
   
-  #cpm.treated = cpm[, which(dds$treatment=="treated")]
-  if(length(which(dds$treatment=="untreated"))>1) {mean.untreated = apply(cpm[, which(dds$treatment=="untreated")], 1, mean);
-  }else {mean.untreated = cpm[, which(dds$treatment=="untreated")];}
-  
-  if(length(which(dds$treatment=="treated"))>1) {mean.treated = apply(cpm[, which(dds$treatment=="treated")], 1, mean);
-  }else {mean.treated = cpm[, which(dds$treatment=="treated")];}
-  
-  if(sampletoUse=="untreated") gene.expressed = unique(ggs[which(mean.untreated>cpm.threshold)])
-  if(sampletoUse=="treated") gene.expressed = unique(ggs[which(mean.treated>cpm.threshold)])
-  if(sampletoUse=="all"){
-    mean.all = apply(as.matrix(cbind(mean.treated, mean.untreated)), 1, mean);
-    gene.expressed = unique(ggs[which(mean.all>cpm.threshold)])
-  } 
-  if(sampletoUse=="untreated.or.treated") gene.expressed = unique(ggs[which(mean.treated>cpm.threshold|mean.untreated>cpm.threshold)])
-  
-  mirna.expressed = !is.na(match(ggs, gene.expressed))
-  sels = data.frame(miRNA=rownames(cpm), gene=ggs, expressed=mirna.expressed, stringsAsFactors = FALSE)
-  
-  ggs.uniq = unique(sels$gene)
-  cat("nb of expressed genes --", length(gene.expressed), "-- miRNAs", sum(sels$expressed), "\n")
-  
-  for(n in 1:length(ggs.uniq))
-  {
-    #n = 1
-    jj = which(sels$gene==ggs.uniq[n])
-    if(length(jj)>1){
-      if(length(which(dds$treatment=="untreated"))>1){index.max = apply(cpm.untreated[jj,], 2, which.max);
-      }else{index.max = which.max(cpm.untreated[jj])}
-      nb.first.max = length(which(index.max==1))
-      nb.sec.max = length(which(index.max==2))
-      #cat(n, ": ", as.character(ggs.uniq[n]), "--",  nb.first.max, "--", nb.sec.max, "\n")
-      if(nb.first.max>nb.sec.max){ sels$miRNA[jj[1]] = sels$gene[jj[1]];
-      }else{sels$miRNA[jj[2]] = sels$gene[jj[2]];}
+  #cpm = fpm(dds, robust = FALSE)
+  if(species == "cel"){
+    ggs = sapply(rownames(cpm), find.mirName)
+  }else{
+    if(species == "dm"){
+      ggs = sapply(rownames(cpm), find.mirName.dm)
     }else{
-      sels$miRNA[jj] = sels$gene[jj];
+      cat("unknown species ---\n")
     }
   }
   
-  return(list(miRNA=sels$miRNA, expressed=sels$expressed, cpm=cpm))
+  if(ncol(cpm)>1) {
+    mean.cpm = apply(cpm, 1, mean);
+  }else{
+    mean.cpm = cpm;
+  }
+  gene.expressed = unique(ggs[which(mean.cpm > cpm.threshold)])
+  
+  #cpm.untreated = cpm[, which(dds$treatment=="untreated")]
+  #cpm.treated = cpm[, which(dds$treatment=="treated")]
+    
+  #if(length(which(dds$treatment=="treated"))>1) {mean.treated = apply(cpm[, which(dds$treatment=="treated")], 1, mean);
+  #}else {mean.treated = cpm[, which(dds$treatment=="treated")];}
+  
+  #if(sampletoUse=="untreated") 
+  #if(sampletoUse=="treated") gene.expressed = unique(ggs[which(mean.treated>cpm.threshold)])
+  #if(sampletoUse=="all"){
+  #  mean.all = apply(as.matrix(cbind(mean.treated, mean.untreated)), 1, mean);
+  #  gene.expressed = unique(ggs[which(mean.all>cpm.threshold)])
+  #} 
+  #if(sampletoUse=="untreated.or.treated") gene.expressed = unique(ggs[which(mean.treated>cpm.threshold|mean.untreated>cpm.threshold)])
+  index.expressed = which(!is.na(match(ggs, gene.expressed)))
+  
+  mirna.all = data.frame(rownames(cpm), ggs, cpm, mean=mean.cpm)
+  mirna.expressed = mirna.all[index.expressed, ]
+  colnames(mirna.expressed)[c(1:2)] = c("miRNA", "gene")
+  
+  expressed.mature.mirna = find.mature.ones.for.prefixed.expressed.miRNAs(mirna.expressed)
+  
+  return(expressed.mature.mirna)
+  #return(list(miRNA=sels$miRNA, expressed=sels$expressed, cpm=cpm))
 }
 
 ## updated version of identify.expressed.miRNAs for time series or stages 
@@ -557,8 +560,11 @@ find.mature.ones.for.prefixed.expressed.miRNAs = function(list.expressed.miRNAs)
   return(expressed.miRNAs)
 }
 
-
-
+######################################
+######################################
+## Section: other functions
+######################################
+######################################
 find.replicates.by.removing.ID = function(x)
 {
   infos = unlist(strsplit(x, "_"))

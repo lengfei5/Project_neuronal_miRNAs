@@ -142,11 +142,16 @@ if(Filter.lowly.expressed.using.predefined.miRNA.list){
 }
 
 if(Filter.lowly.expressed.using.cpm.threshold){ # filter the non-expressed miRNAs using cpm threshold
+  
   kk = intersect(grep("L3", design$tissue.cell), which(design$treatment=='untreated'))
-  expressed.miRNAs = identify.expressed.miRNAs.using.cpm.threshold(all[, (kk+1)], cpm.threshold=10)   
+  rownames(all) = all$gene 
+  ## the rownames should be the miRNA names
+  expressed.miRNAs = find.expressed.mature.miRNA.using.cpm.threshold(all[, (kk+1)], cpm.threshold=10)
+  
 }
+
 ####################
-## Enrichment Analysis for each neuron class 
+## Enrichment Analysis for each neuron class
 ####################
 require('DESeq2')
 read.count = all[, -1];
@@ -223,6 +228,7 @@ for(n in c(16))
       cat(specifity, "--", cc, "--", as.character(prot), "\n")
       
       jj = which(design.matrix$genotype==cc & design.matrix$promoter==prot)
+      
       if(length(jj)>=2)
       {
         ## add N2 genotype if WT bakcground for interaction term; 
@@ -244,13 +250,13 @@ for(n in c(16))
         jj.expressed = match(rownames(dds), expressed.miRNAs$miRNA)
         sels = !is.na(jj.expressed)
         cat("nb of expressed miRNAs --", sum(sels), "\n")
+        #cat("nb of expressed genes -- ", sum(expressed.miRNAs$mature[sels]))
         dds = dds[sels, ]
         index.sel = jj.expressed[sels]
         jj.mature = expressed.miRNAs$mature[index.sel]
-        rownames(dds)[jj.mature] = expressed.miRNAs$gene[index.sel[jj.mature]]
+        rownames(dds)[jj.mature] = as.character(expressed.miRNAs$gene[index.sel[jj.mature]])
         cpm0 = cpm0[sels, ]
         
-            
         #cat("size factor is -- ", sizeFactors(dds), "\n")
         
         ## estimate scaling factor and dispersion parameter
