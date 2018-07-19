@@ -17,18 +17,32 @@ version.EnrichscoreMatrix = "20180506"
 resDir = "../results/decomvolution_results"
 if(!dir.exists(resDir)) dir.create(resDir)
 
-fitting.space = "logscale" ## linear or log2 transformed for expression matrix
+fitting.space = "linear" ## linear or log2 transformed for expression matrix
 
 ######################################
 ######################################
-## Section: import the fraction matrix and expression matrix
+## Section: load fraction matrix A and merge similar neuron classes
 ######################################
 ######################################
-## load and process fraction matrix
-load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", version.Fraction.Matrix, ".Rdata"))
+load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", 
+                   version.Fraction.Matrix, ".Rdata"))
+source('miRNAseq_functions.R')
+
+pdfname = paste0(resDir, "/heatmap_for_merging_proportionaMatrix.pdf")
+pdf(pdfname, width=15, height = 6)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+par(mfrow=c(1, 1))
+
+newprop = proportions.matrix.merging.neuronClass(proportions)
+
+dev.off()
 
 
-## load and process the enrichment score matrix and the expression matrix
+######################################
+######################################
+## Section: enrichment score matrix and expression matrix
+######################################
+######################################
 load(file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.EnrichscoreMatrix, ".Rdata"))
 enriched.list = colnames(enrich.matrix.sel)
 #enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
@@ -40,6 +54,9 @@ xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
 ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
 ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
 colnames(xx) = c('whole.body', 'background', ncs)
+
+source('miRNAseq_functions.R')
+newExprM = expressionMatrix.grouping(xx)
 
 ####################
 ## here we transform the gene expression by e'= (expression-background)/background 

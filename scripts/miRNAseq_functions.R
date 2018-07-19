@@ -765,3 +765,113 @@ calculate.pvalues.two.groups.overlapping = function(nb.total, nb.group.A, nb.gro
 }
 
 
+####################
+## function to merge the neuron classes for fraction matrix 
+####################
+proportions.matrix.merging.neuronClass = function(proportions, using.binary.matrix = TRUE, Test.by.plot = TRUE)
+{
+  cat("merge the neuron classes if they are not distinguishable ...\n")
+  
+  # Test.by.plot = TRUE
+  xx = proportions;
+  xx[which(xx>0)] = 1
+  
+  mydata = t(xx)
+  mydata <- na.omit(mydata) # listwise deletion of missing
+  #mydata <- scale(mydata) # standardize variables 
+  
+  d <- dist(mydata, method = "euclidean") # distance matrix
+  fit <- hclust(d, method="ward.D2")
+  groups <- cutree(fit, h=0) # cut tree into 5 clusters
+  nb.clusters = length(unique(groups))
+  
+  # start to merge neuron classes if they have zero distance in the presence-absence matrix
+  newdata = matrix(NA, ncol = nb.clusters, nrow = nrow(proportions))
+  rownames(newdata) = rownames(proportions)
+  colnames(newdata) = rep('x', ncol(newdata))
+  #names.merged = c()
+  for(n in 1:nb.clusters)
+  {
+    # n = 1
+    kk = which(groups == n)
+    cat("cluster", n, "--", names(groups)[kk],"\n")
+    colnames(newdata)[n] = paste0(names(groups)[kk], collapse = ".")
+    if(length(kk)>1){
+      newdata[,n] = apply(proportions[, kk], 1, sum)
+    }else{
+      if(length(kk)==0){
+        cat("Error-- no neuron classes found \n")
+      }else{
+        newdata[,n] = proportions[, kk]
+      }
+    }
+  }
+  
+  if(Test.by.plot){
+    library("pheatmap")
+    library("RColorBrewer")
+    
+    pheatmap(xx, 
+             cluster_rows=FALSE, 
+             show_rownames=TRUE, show_colnames = TRUE,
+             cluster_cols=TRUE, 
+             color = c("lightgray", "blue"), legend = FALSE)
+    
+    
+    plot(fit, cex=0.8) # display dendogram
+    
+    # draw dendogram with red borders around the 5 clusters
+    rect.hclust(fit, k=nb.clusters, border="red")
+    abline(h= 0, col='darkblue', lwd=2.0)
+    #abline(h= 1, col='darkblue', lwd=2.0, lty=2.0)
+    
+    yy = newdata;
+    yy[which(yy>0)] = 1
+    
+    pheatmap(yy, 
+             cluster_rows=FALSE, 
+             show_rownames=TRUE, show_colnames = TRUE,
+             cluster_cols=TRUE, 
+             color = c("lightgray", "blue"), legend = FALSE)
+    
+    
+  }
+  
+  return(newdata)
+  
+}
+
+expressionMatrix.grouping = function(xx, using.logscale = TRUE)
+{
+  expression = xx[, -c(1, 2)]
+  for(n in 1:ncol(expression)) 
+  {
+    expression[,n] = log2(expression[,n]/xx$background)
+  }
+  
+  iris.scaled <- scale(expression)
+  
+  require(cluster)
+  fviz_nbclust((iris.scaled), hcut, method = "silhouette",
+               hc_method = "complete", k.max = 120)
+  
+  library(cluster)
+  #set.seed(123)
+  #gap_stat <- clusGap(iris.scaled, FUN = kmeans, nstart = 25,
+  #                    K.max = 10, B = 50)
+  
+  set.seed(123)
+  gap_stat <- clusGap(iris.scaled, FUN = hcut, K.max = 120, B = 50)
+  #print(gap_stat, method = "firstmax")
+  
+  # Plot gap statistic
+  plot(gap_stat, frame = FALSE, xlab = "Number of clusters k")
+  abline(v = 3, lty = 2)
+  
+  fviz_gap_stat(gap_stat)
+  
+  # Print the result
+  print(gap_stat, method = "firstmax")
+  
+  
+}
