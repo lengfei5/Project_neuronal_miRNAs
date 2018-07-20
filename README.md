@@ -1,5 +1,7 @@
+# Deconvolution analysis for neuronal-specific miRNA expression
+
 ### `miRNA_time_series_spikeIns.R`
- - versions:   
+  - versions:   
     - "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180620"  
       -correct the spike-in normalization    
     - "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180719"  

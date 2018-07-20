@@ -13,7 +13,7 @@ source('miRNAseq_functions.R')
 
 ### data verision and analysis version   
 version.Data = 'miRNAs_timeSeries_spikeIn_R5922_R6016';
-version.analysis = paste0("_", version.Data, "_20180719")
+version.analysis = paste0("_", version.Data, "_20180620")
 
 ### Directories to save results 
 design.file = "../exp_design/Libaries_time_series_spikIns.xlsx"
@@ -107,9 +107,88 @@ save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analys
 
 ##################################################
 ##################################################
-## Section: check data quality and spike-in quality
+## Section: Data Quality and spike-in normalization
 ##################################################
 ##################################################
+load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+read.count = all[, -1];
+kk = c(1:nrow(design))
+
+design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
+raw = as.matrix(read.count[,kk])
+raw[which(is.na(raw))] = 0
+### start enrichment analysis 
+raw = floor(raw)
+rownames(raw) = all$gene
+
+####################
+## QC for cpm 
+####################
+#treat = length(unique(design$treatment[kk]));
+#index.qc = c(3, 5)[which(c(length(unique(design.matrix$genotype)), length(unique(design.matrix$promoter)))>1)]
+index.qc = c(1, 3,4)
+
+source("RNAseq_Quality_Controls.R")
+pdfname = paste0(resDir, "/Data_qulity_assessment_early_L1_and_all", version.analysis, ".pdf")
+pdf(pdfname, width = 12, height = 10)
+Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix[, index.qc])
+dev.off()
+
+####################
+## spike-in normalization 
+####################
+### check spike-ins and then check quality using spike-in normalization 
+sel.samples.with.spikeIns = which(design.matrix$stage != "L1.early")
+design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
+countData = raw[, sel.samples.with.spikeIns]
+
+#o1 = order(design.matrix$genotype)
+#design.matrix = design.matrix[o1, ]
+#countData = countData[, o1]
+
+dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ treatment + stage)
+#dds$genotype <- relevel(dds$genotype, ref="WT");
+#dds$treatment = relevel(dds$treatment, ref="untreated");
+index.spikeIn = grep("spikeIn", rownames(dds))
+concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
+
+## calculate scaling factor using spike-ins
+source("miRNAseq_functions.R")
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+
+par(mfrow=c(2,2))
+#norms = calculate.scaling.factors.using.spikeIns(dds, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+res.spike.in = calculate.scaling.factors.using.spikeIns(counts(dds), 
+                                                        concentrations = concentrations, 
+                                                        index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
+norms = res.spike.in$norms4DESeq2;
+sizeFactors(dds) = res.spike.in$norms4DESeq2
+
+#res = fpm(dds, robust = TRUE)
+#cpm =  fpm(dds, robust = FALSE)
+#kk = grep("spikeIn", rownames(cpm))
+
+cpm = res.spike.in$cpm;
+res = res.spike.in$normalization.spikeIn
+colnames(cpm) = paste0(colnames(cpm), ".cpm")
+colnames(res) = paste0(colnames(res), ".mpu.normalized.spikeIn")
+
+ss = apply(raw, 2, sum)
+plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+#plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+
+#plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+res = data.frame(res, cpm)
+
+write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns_corrected", version.analysis, ".txt")), 
+            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
+
+
+
 Compare.spikeIns.old.vs.new = FALSE
 if(Compare.spikeIns.old.vs.new)
 {
@@ -133,67 +212,13 @@ if(Compare.spikeIns.old.vs.new)
   dev.off()
 }
 
-load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
 
-read.count = all[, -1];
-
-kk = c(1:nrow(design))
-
-design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
-raw = as.matrix(read.count[,kk])
-raw[which(is.na(raw))] = 0
-### start enrichment analysis 
-raw = floor(raw)
-rownames(raw) = all$gene
-
-#treat = length(unique(design$treatment[kk]));
-#index.qc = c(3, 5)[which(c(length(unique(design.matrix$genotype)), length(unique(design.matrix$promoter)))>1)]
-index.qc = c(1, 3,4)
-
-source("RNAseq_Quality_Controls.R")
-pdfname = paste0(resDir, "/Data_qulity_assessment_early_L1_and_all", version.analysis, ".pdf")
-pdf(pdfname, width = 12, height = 10)
-Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix[, index.qc])
-dev.off()
-
-### check spike-ins and then check quality using spike-in normalization 
-sel.samples.with.spikeIns = which(design.matrix$stage != "L1.early")
-design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
-countData = raw[, sel.samples.with.spikeIns]
-
-#o1 = order(design.matrix$genotype)
-#design.matrix = design.matrix[o1, ]
-#countData = countData[, o1]
-
-dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ treatment + stage)
-#dds$genotype <- relevel(dds$genotype, ref="WT");
-#dds$treatment = relevel(dds$treatment, ref="untreated");
-index.spikeIn = grep("spikeIn", rownames(dds))
-concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25)*100
-
-## calculate scaling factor using spike-ins
-source("miRNAseq_functions.R")
-pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 10)
-
-par(mfrow=c(2,2))
-#norms = calculate.scaling.factors.using.spikeIns(dds, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
-res.spike.in = calculate.scaling.factors.using.spikeIns(counts(dds), 
-                                                        concentrations = concentrations, 
-                                                        index.spikeIn = index.spikeIn, read.threshold = 5)
-
-dev.off()
-
-norms = res.spike.in$norms4DESeq2;
-sizeFactors(dds) = res.spike.in$norms4DESeq2
-
-res = fpm(dds, robust = TRUE)
-cpm =  fpm(dds, robust = FALSE)
-kk = grep("spikeIn", rownames(cpm))
+####################
+## QC for spike-in normalizaiton 
+####################
 
 index.qc = c(1, 3,4)
 source("RNAseq_Quality_Controls.R")
-
 pdfname = paste0(resDir, "/Data_qulity_assessment_all_samples_withSpikeIns", version.analysis, ".pdf")
 pdf(pdfname, width = 12, height = 10)
 Check.RNAseq.Quality(read.count=countData, design.matrix = design.matrix[, index.qc], norms = norms)
@@ -280,18 +305,18 @@ if(Make.new.list.of.expressed.miRNAs){
   countData[which(is.na(countData))] = 0
   rownames(countData) = all$gene;
   
-  #new.list.expressed.miRNA = identify.expressed.miRNAs(countData, design.matrix)  
-  new.list.expressed.miRNA = identify.expressed.miRNAs.for.stages(countData, design.matrix)
+  new.list.expressed.miRNA = identify.expressed.miRNAs(countData, design.matrix)  
+  
   #write.csv(new.list.expressed.miRNA, file = paste0(tabDir, "new_list_expressed_miRNAs_lateL1_L4.csv"), row.names=FALSE, quote = FALSE)
 }
 
 # filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
 if(Filter.lowly.expressed.using.predefined.miRNA.list){
   # prepare old llist
-  list.old = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed.miRNAs)
-  #find.mature.ones.for.prefixed.expressed.miRNAs
+  list.old = find.mature.ones.for.expressed.miRNAs(list.expressed.miRNAs)
+  
   # new list
-  list.new = find.mature.ones.for.prefixed.expressed.miRNAs(new.list.expressed.miRNA)
+  list.new = find.mature.ones.for.expressed.miRNAs(new.list.expressed.miRNA)
   
   old.list = list.old[, c(1:3)]
   new.list = list.new[, c(1:3)]
@@ -303,11 +328,7 @@ if(Filter.lowly.expressed.using.predefined.miRNA.list){
   index2add = which(!is.na(mm))
   expressed.miRNAs = data.frame(rbind(new.list, old.list[index2add, ]), stringsAsFactors = FALSE)
   expressed.miRNAs$mature = expressed.miRNAs$mature>0
-  
-  save(expressed.miRNAs, file=paste0(RdataDir, 'list_expressed_miRNAs_across_stages', version.analysis, '.Rdata'))
-  
 }
-
 
 ####################
 ## start Enrichment Analysis for each neuron class 
@@ -445,38 +466,8 @@ for(n in 1:length(tcs))
 ## Section: Enrichment vs absolute (data normalized with spike-ins)
 ##################################################
 ##################################################
-## calculate scaling factor using spike-ins
-source("miRNAseq_functions.R")
-pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 10)
-par(mfrow=c(2,2))
-
-res.spike.in = calculate.scaling.factors.using.spikeIns(raw, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
-
-dev.off()
-
-#sizeFactors(dds) = res.spike.in$norms4DESeq2
-#cpm =  fpm(dds, robust = FALSE)
-#res = fpm(dds, robust = TRUE)
-cpm = res.spike.in$cpm;
-res = res.spike.in$normalization.spikeIn
-colnames(cpm) = paste0(colnames(cpm), ".cpm")
-colnames(res) = paste0(colnames(res), ".amol.per.mugRNA.normBySpikeIn")
-
-ss = apply(raw, 2, sum)
-plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-#plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-
-#plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-res = data.frame(res, cpm)
-
-write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns", version.analysis, ".txt")), 
-            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
-
-
-version.analysis.enrichment = "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180620" 
-load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis.enrichment, '.Rdata'))
-enrich.files = list.files(path = tabDir, pattern = paste0("*Mature_", version.analysis.enrichment, ".csv"), full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
+load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+enrich.files = list.files(path = tabDir, pattern = paste0("*Mature_", version.analysis, ".csv"), full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
 
 tt = unique(design$stage)
 for(n in 1:length(tt))
@@ -493,6 +484,17 @@ for(n in 1:length(tt))
   colnames(enriched)[c(ncol(enriched), (ncol(enriched)-1))] = paste0(tt[n], "_", c("log2FC", "pvalue"))
 }
 
+<<<<<<< HEAD
+
+
+####################
+## explore the relationship between enrichment and absolute values
+####################
+expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
+rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
+mpu = res[match(rownames(enriched), rownames(res)), ]
+
+=======
 ####################
 ## recheck the spike-in normalization from the raw table and design
 ####################
@@ -506,8 +508,35 @@ raw[which(is.na(raw))] = 0
 rownames(raw) = all$gene
 #dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ treatment + stage)
 index.spikeIn = grep("spikeIn", rownames(raw))
-concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*10
+concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
 
+## calculate scaling factor using spike-ins
+source("miRNAseq_functions.R")
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+par(mfrow=c(2,2))
+
+res.spike.in = calculate.scaling.factors.using.spikeIns(raw, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
+#sizeFactors(dds) = res.spike.in$norms4DESeq2
+#cpm =  fpm(dds, robust = FALSE)
+#res = fpm(dds, robust = TRUE)
+cpm = res.spike.in$cpm;
+res = res.spike.in$normalization.spikeIn
+colnames(cpm) = paste0(colnames(cpm), ".cpm")
+colnames(res) = paste0(colnames(res), ".mpu.normalized.spikeIn")
+
+ss = apply(raw, 2, sum)
+plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+#plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+
+#plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+res = data.frame(res, cpm)
+
+write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns_corrected", version.analysis, ".txt")), 
+            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
 
 
 ####################
@@ -515,55 +544,15 @@ concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*10
 ####################
 expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
 rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
+mpu = res[match(rownames(enriched), rownames(res)), ]
 
-xx = res[match(rownames(enriched), rownames(res)), ]
+>>>>>>> parent of 243b03e... add README.md here, especially for the version notes
+enriched = enriched[, -c(1:2)]
+tt = tt[-1]
 
-index.sel = c()
-for(n in 1:nrow(enriched))
-{
-  for(m in 1:length(tt))
-  {
-    if(m==1){
-      if(enriched[n, (2*m-1)] < 0.001 & enriched[n, 2*m] >1) index.sel = c(index.sel, n)
-    }else{
-      if(enriched[n, (2*m-1)] < 0.01 & enriched[n, 2*m] >1) index.sel = c(index.sel, n)
-    }
-    
-  }
-}
-
-index.sel = unique(index.sel)
-
-yy = xx[index.sel, ]
-yy = yy[, grep("normBySpikeIn", colnames(yy))]
-yy = yy[, grep("_treated_", colnames(yy))]
-
-yy = data.frame(apply(yy[, c(1:2)], 1, mean), 
-                apply(yy[, c(3,4)], 1, mean), 
-                apply(yy[, c(5,6)], 1, mean), 
-                apply(yy[, c(7,8)], 1, mean))
-colnames(yy) = paste0(tt[-1], "_treated")
-
-pdfname = paste0(resDir, "/heatmap_for_treatedSamples_normSpikeIns", version.analysis, ".pdf")
-pdf(pdfname, width=6, height = 12)
-par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-par(mfrow=c(1, 1))
-# par(mfcol=c(1, 1))
-
-yy0 = log2(yy)
-pheatmap(yy0, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
-         cluster_cols=FALSE,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
-
-dev.off()
-
-#enriched = enriched[, -c(1:2)]
-#tt = tt[-1]
-
-
-#stats.mpu = matrix(NA, nrow = nrow(mpu), ncol=3*length(tt))
-#rownames(stats.mpu) = rownames(mpu)
-#colnames(stat.mpu) = paste(tt, c("_untreated.mpu", '_treated.mpu', '_ratio.mpu'))
+stats.mpu = matrix(NA, nrow = nrow(mpu), ncol=3*length(tt))
+rownames(stats.mpu) = rownames(mpu)
+colnames(stat.mpu) = paste(tt, c("_untreated.mpu", '_treated.mpu', '_ratio.mpu'))
 
 
 ##################################################
