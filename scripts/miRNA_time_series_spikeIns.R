@@ -484,6 +484,7 @@ for(n in 1:length(tt))
   colnames(enriched)[c(ncol(enriched), (ncol(enriched)-1))] = paste0(tt[n], "_", c("log2FC", "pvalue"))
 }
 
+<<<<<<< HEAD
 
 
 ####################
@@ -493,6 +494,59 @@ expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
 rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
 mpu = res[match(rownames(enriched), rownames(res)), ]
 
+=======
+####################
+## recheck the spike-in normalization from the raw table and design
+####################
+require('DESeq2')
+read.count = all[, -1];
+sel.samples.with.spikeIns = which(design$stage != "L1.early")
+
+#design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
+raw = floor(as.matrix(read.count[,sel.samples.with.spikeIns]))
+raw[which(is.na(raw))] = 0
+rownames(raw) = all$gene
+#dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ treatment + stage)
+index.spikeIn = grep("spikeIn", rownames(raw))
+concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
+
+## calculate scaling factor using spike-ins
+source("miRNAseq_functions.R")
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+par(mfrow=c(2,2))
+
+res.spike.in = calculate.scaling.factors.using.spikeIns(raw, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
+#sizeFactors(dds) = res.spike.in$norms4DESeq2
+#cpm =  fpm(dds, robust = FALSE)
+#res = fpm(dds, robust = TRUE)
+cpm = res.spike.in$cpm;
+res = res.spike.in$normalization.spikeIn
+colnames(cpm) = paste0(colnames(cpm), ".cpm")
+colnames(res) = paste0(colnames(res), ".mpu.normalized.spikeIn")
+
+ss = apply(raw, 2, sum)
+plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+#plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+
+#plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+res = data.frame(res, cpm)
+
+write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns_corrected", version.analysis, ".txt")), 
+            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
+
+
+####################
+## explore the relationship between enrichment and absolute values
+####################
+expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
+rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
+mpu = res[match(rownames(enriched), rownames(res)), ]
+
+>>>>>>> parent of 243b03e... add README.md here, especially for the version notes
 enriched = enriched[, -c(1:2)]
 tt = tt[-1]
 
