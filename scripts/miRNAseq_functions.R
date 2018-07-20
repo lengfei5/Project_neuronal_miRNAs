@@ -290,7 +290,7 @@ my.cpm.normalization = function(countData)
   return(cpm)
 }
 
-calculate.scaling.factors.using.spikeIns = function(countData, concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25),
+calculate.scaling.factors.using.spikeIns = function(countData, concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250),
                                                     index.spikeIn=c(1:8), read.threshold=5, 
                                                     method="Ratio", plot.spikeIns.summary = TRUE)
 {
