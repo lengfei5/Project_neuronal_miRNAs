@@ -466,10 +466,12 @@ for(n in 1:length(tcs))
 ##################################################
 ## Section: Enrichment vs absolute (data normalized with spike-ins)
 ##################################################
-##################################################
-####################
-## import enrichment scores 
-####################
+load(file=paste0(RdataDir, 'Design_Raw_readCounts_cpm_spikeInsNorm', version.analysis, '.Rdata'))
+load(file=paste0(RdataDir, 'list_expressed_miRNAs_across_stages', version.analysis, '.Rdata'))
+
+expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
+rownames(expressed) = expressed$miRNA
+
 version.analysis.enrichment = "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180620" 
 load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis.enrichment, '.Rdata'))
 enrich.files = list.files(path = tabDir, pattern = paste0("*Mature_", version.analysis.enrichment, ".csv"), full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
@@ -488,31 +490,27 @@ for(n in 1:length(tt))
   }
   colnames(enriched)[c(ncol(enriched), (ncol(enriched)-1))] = paste0(tt[n], "_", c("log2FC", "pvalue"))
 }
+rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
 
 ####################
 ## Check the global expression in the untreated samples
 ####################
-load(file=paste0(RdataDir, 'Design_Raw_readCounts_cpm_spikeInsNorm', version.analysis, '.Rdata'))
-load(file=paste0(RdataDir, 'list_expressed_miRNAs_across_stages', version.analysis, '.Rdata'))
-
-expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
-rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
-
 kk = intersect(grep('normBySpikeIn', colnames(res)), grep('untreated', colnames(res)))
-xx = res[match(rownames(expressed), rownames(res)), ]
+jj = match(rownames(expressed), rownames(res))
+xx = res[jj, ]
 
 xx = average.biological.replicates(xx[,kk])
-xx = data.frame(log2(xx))
+xx = data.frame(log2(xx+10^-4))
 
 pdfname = paste0(resDir, "/heatmap_for_untreatedSamples_normSpikeIns", version.analysis, ".pdf")
-pdf(pdfname, width=6, height = 12)
+pdf(pdfname, width=6, height = 20)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
 # par(mfcol=c(1, 1))
 library(pheatmap)
 library(RColorBrewer)
 
-pheatmap(xx[order(-xx$L1.late_untreated), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+pheatmap(xx[order(-xx$L1.late_untreated), ], cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
          cluster_cols=FALSE,
          color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
 
@@ -521,7 +519,8 @@ dev.off()
 ####################
 ## Check the neuron-specific miRNAs expression
 ####################
-xx = res[match(rownames(enriched), rownames(res)), ]
+kk = intersect(grep('normBySpikeIn', colnames(res)), grep('_treated', colnames(res)))
+xx = res[match(rownames(enriched), rownames(res)), kk]
 
 index.sel = c()
 for(n in 1:nrow(enriched))
@@ -540,14 +539,7 @@ for(n in 1:nrow(enriched))
 index.sel = unique(index.sel)
 
 yy = xx[index.sel, ]
-yy = yy[, grep("normBySpikeIn", colnames(yy))]
-yy = yy[, grep("_treated_", colnames(yy))]
-
-yy = data.frame(apply(yy[, c(1:2)], 1, mean), 
-                apply(yy[, c(3,4)], 1, mean), 
-                apply(yy[, c(5,6)], 1, mean), 
-                apply(yy[, c(7,8)], 1, mean))
-colnames(yy) = paste0(tt[-1], "_treated")
+yy = data.frame(average.biological.replicates(yy))
 
 pdfname = paste0(resDir, "/heatmap_for_treatedSamples_normSpikeIns", version.analysis, ".pdf")
 pdf(pdfname, width=6, height = 12)
@@ -557,11 +549,19 @@ par(mfrow=c(1, 1))
 
 yy0 = log2(yy)
 pheatmap(yy0, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
-         cluster_cols=FALSE,
+         cluster_cols=FALSE, main = "log2(spikeIns.norm)",
+         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+
+
+
+max.yy0 = apply(yy0, 1, max)
+yy1 = 2^(yy0 - max.yy0)
+
+pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+         cluster_cols=FALSE, main = "ratio to maximum",
          color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
 
 dev.off()
-
 #enriched = enriched[, -c(1:2)]
 #tt = tt[-1]
 
