@@ -188,6 +188,7 @@ write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.facto
             sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
 
 
+
 Compare.spikeIns.old.vs.new = FALSE
 if(Compare.spikeIns.old.vs.new)
 {
