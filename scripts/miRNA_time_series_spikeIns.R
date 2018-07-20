@@ -107,32 +107,9 @@ save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analys
 
 ##################################################
 ##################################################
-## Section: check data quality and spike-in quality
+## Section: Data Quality and spike-in normalization
 ##################################################
 ##################################################
-Compare.spikeIns.old.vs.new = FALSE
-if(Compare.spikeIns.old.vs.new)
-{
-  version.analysis.old = "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180503"
-  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis.old, '.Rdata'))
-  old = all[c(1:8), -c(1:5)]
-  
-  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
-  new = all[c(1:8), -c(1:5)]
-  
-  pdfname = paste0(resDir, "/SpikeIns_comparison_new_vs_old", version.analysis, ".pdf")
-  pdf(pdfname, width = 16, height = 16)
-  
-  par(mfrow=c(4,4))
-  for(n in 1:ncol(new))
-  {
-    plot(old[,n]+0.5, new[, n], type='p', cex=2.0, pch=16, log='xy', col= 'darkblue', xlab='spikeIn read counts (old)', ylab='spikeIn read counts (new)')
-    abline(0, median(new[,n]/old[,n]), lwd=2.0, col='red', untf = TRUE)
-  }
-  
-  dev.off()
-}
-
 load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
 
 read.count = all[, -1];
@@ -190,6 +167,78 @@ sizeFactors(dds) = res.spike.in$norms4DESeq2
 res = fpm(dds, robust = TRUE)
 cpm =  fpm(dds, robust = FALSE)
 kk = grep("spikeIn", rownames(cpm))
+
+####################
+## recheck the spike-in normalization from the raw table and design
+####################
+require('DESeq2')
+read.count = all[, -1];
+sel.samples.with.spikeIns = which(design$stage != "L1.early")
+
+#design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
+raw = floor(as.matrix(read.count[,sel.samples.with.spikeIns]))
+raw[which(is.na(raw))] = 0
+rownames(raw) = all$gene
+#dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ treatment + stage)
+index.spikeIn = grep("spikeIn", rownames(raw))
+concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
+
+## calculate scaling factor using spike-ins
+source("miRNAseq_functions.R")
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+par(mfrow=c(2,2))
+
+res.spike.in = calculate.scaling.factors.using.spikeIns(raw, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
+#sizeFactors(dds) = res.spike.in$norms4DESeq2
+#cpm =  fpm(dds, robust = FALSE)
+#res = fpm(dds, robust = TRUE)
+cpm = res.spike.in$cpm;
+res = res.spike.in$normalization.spikeIn
+colnames(cpm) = paste0(colnames(cpm), ".cpm")
+colnames(res) = paste0(colnames(res), ".mpu.normalized.spikeIn")
+
+ss = apply(raw, 2, sum)
+plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+#plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+
+#plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+res = data.frame(res, cpm)
+
+write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns_corrected", version.analysis, ".txt")), 
+            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
+
+
+Compare.spikeIns.old.vs.new = FALSE
+if(Compare.spikeIns.old.vs.new)
+{
+  version.analysis.old = "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180503"
+  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis.old, '.Rdata'))
+  old = all[c(1:8), -c(1:5)]
+  
+  load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+  new = all[c(1:8), -c(1:5)]
+  
+  pdfname = paste0(resDir, "/SpikeIns_comparison_new_vs_old", version.analysis, ".pdf")
+  pdf(pdfname, width = 16, height = 16)
+  
+  par(mfrow=c(4,4))
+  for(n in 1:ncol(new))
+  {
+    plot(old[,n]+0.5, new[, n], type='p', cex=2.0, pch=16, log='xy', col= 'darkblue', xlab='spikeIn read counts (old)', ylab='spikeIn read counts (new)')
+    abline(0, median(new[,n]/old[,n]), lwd=2.0, col='red', untf = TRUE)
+  }
+  
+  dev.off()
+}
+
+
+####################
+## QC for spike-in normalizaiton 
+####################
 
 index.qc = c(1, 3,4)
 source("RNAseq_Quality_Controls.R")
@@ -458,48 +507,6 @@ for(n in 1:length(tt))
   colnames(enriched)[c(ncol(enriched), (ncol(enriched)-1))] = paste0(tt[n], "_", c("log2FC", "pvalue"))
 }
 
-####################
-## recheck the spike-in normalization from the raw table and design
-####################
-require('DESeq2')
-read.count = all[, -1];
-sel.samples.with.spikeIns = which(design$stage != "L1.early")
-
-#design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
-raw = floor(as.matrix(read.count[,sel.samples.with.spikeIns]))
-raw[which(is.na(raw))] = 0
-rownames(raw) = all$gene
-#dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ treatment + stage)
-index.spikeIn = grep("spikeIn", rownames(raw))
-concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
-
-## calculate scaling factor using spike-ins
-source("miRNAseq_functions.R")
-pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 10)
-par(mfrow=c(2,2))
-
-res.spike.in = calculate.scaling.factors.using.spikeIns(raw, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
-
-dev.off()
-
-#sizeFactors(dds) = res.spike.in$norms4DESeq2
-#cpm =  fpm(dds, robust = FALSE)
-#res = fpm(dds, robust = TRUE)
-cpm = res.spike.in$cpm;
-res = res.spike.in$normalization.spikeIn
-colnames(cpm) = paste0(colnames(cpm), ".cpm")
-colnames(res) = paste0(colnames(res), ".mpu.normalized.spikeIn")
-
-ss = apply(raw, 2, sum)
-plot(raw[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-#plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-
-#plot(raw[,1]/prod(ss)^(1/length(ss))*10^6/si, res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-res = data.frame(res, cpm)
-
-write.table(res, file = paste0(tabDir, paste0("normalized_signals_scalling.factors_using_spikeIns_corrected", version.analysis, ".txt")), 
-            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
 
 
 ####################
