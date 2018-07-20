@@ -1,19 +1,17 @@
----
-title: "R Notebook"
-output: html_notebook
----
+# Deconvolution analysis for neuronal-specific miRNA expression
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
-```{r}
-plot(cars)
-```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
-
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+### `miRNA_time_series_spikeIns.R`
+  - versions:   
+    - "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180620"  
+      -correct the spike-in normalization    
+    - "_miRNAs_timeSeries_spikeIn_R5922_R6016_20180719"  
+      - correct the concentration for spike ins and the units in the table
+      - make heatmaps for treated samples across stages, trying to address the main question  
+        which miRNAs are for newly-born neurons and which ones are deleted.
+      - reorganize the code : 
+        - data and design process; 
+        - spike-in normalization
+        - QC for cpm and spike-in normalization
+        - enrichment analysis
+        - some real analysis
 
