@@ -498,8 +498,29 @@ load(file=paste0(RdataDir, 'list_expressed_miRNAs_across_stages', version.analys
 expressed = expressed.miRNAs[expressed.miRNAs$mature, ]
 rownames(enriched) = expressed$miRNA[match(rownames(enriched), expressed$gene)]
 
+kk = intersect(grep('normBySpikeIn', colnames(res)), grep('untreated', colnames(res)))
+xx = res[match(rownames(expressed), rownames(res)), ]
 
+xx = average.biological.replicates(xx[,kk])
+xx = data.frame(log2(xx))
 
+pdfname = paste0(resDir, "/heatmap_for_untreatedSamples_normSpikeIns", version.analysis, ".pdf")
+pdf(pdfname, width=6, height = 12)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+par(mfrow=c(1, 1))
+# par(mfcol=c(1, 1))
+library(pheatmap)
+library(RColorBrewer)
+
+pheatmap(xx[order(-xx$L1.late_untreated), ], cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+         cluster_cols=FALSE,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+
+dev.off()
+
+####################
+## Check the neuron-specific miRNAs expression
+####################
 xx = res[match(rownames(enriched), rownames(res)), ]
 
 index.sel = c()
