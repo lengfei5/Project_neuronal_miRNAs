@@ -111,9 +111,7 @@ save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analys
 ##################################################
 ##################################################
 load(file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
-
 read.count = all[, -1];
-
 kk = c(1:nrow(design))
 
 design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
@@ -123,6 +121,9 @@ raw[which(is.na(raw))] = 0
 raw = floor(raw)
 rownames(raw) = all$gene
 
+####################
+## QC for cpm 
+####################
 #treat = length(unique(design$treatment[kk]));
 #index.qc = c(3, 5)[which(c(length(unique(design.matrix$genotype)), length(unique(design.matrix$promoter)))>1)]
 index.qc = c(1, 3,4)
@@ -133,6 +134,9 @@ pdf(pdfname, width = 12, height = 10)
 Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix[, index.qc])
 dev.off()
 
+####################
+## spike-in normalization 
+####################
 ### check spike-ins and then check quality using spike-in normalization 
 sel.samples.with.spikeIns = which(design.matrix$stage != "L1.early")
 design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
@@ -164,38 +168,10 @@ dev.off()
 norms = res.spike.in$norms4DESeq2;
 sizeFactors(dds) = res.spike.in$norms4DESeq2
 
-res = fpm(dds, robust = TRUE)
-cpm =  fpm(dds, robust = FALSE)
-kk = grep("spikeIn", rownames(cpm))
-
-####################
-## recheck the spike-in normalization from the raw table and design
-####################
-require('DESeq2')
-read.count = all[, -1];
-sel.samples.with.spikeIns = which(design$stage != "L1.early")
-
-#design.matrix = data.frame(sample=colnames(read.count)[sel.samples.with.spikeIns], design[sel.samples.with.spikeIns, ])
-raw = floor(as.matrix(read.count[,sel.samples.with.spikeIns]))
-raw[which(is.na(raw))] = 0
-rownames(raw) = all$gene
-#dds <- DESeqDataSetFromMatrix(raw, DataFrame(design.matrix), design = ~ treatment + stage)
-index.spikeIn = grep("spikeIn", rownames(raw))
-concentrations = c(0.5, 2.5, 5.0, 15, 25, 35, 50, 250)*100
-
-## calculate scaling factor using spike-ins
-source("miRNAseq_functions.R")
-pdfname = paste0(resDir, "/Spike_in_signals_normalized_DESeq", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 10)
-par(mfrow=c(2,2))
-
-res.spike.in = calculate.scaling.factors.using.spikeIns(raw, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
-
-dev.off()
-
-#sizeFactors(dds) = res.spike.in$norms4DESeq2
-#cpm =  fpm(dds, robust = FALSE)
 #res = fpm(dds, robust = TRUE)
+#cpm =  fpm(dds, robust = FALSE)
+#kk = grep("spikeIn", rownames(cpm))
+
 cpm = res.spike.in$cpm;
 res = res.spike.in$normalization.spikeIn
 colnames(cpm) = paste0(colnames(cpm), ".cpm")
