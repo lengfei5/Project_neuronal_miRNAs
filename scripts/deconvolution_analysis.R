@@ -20,7 +20,7 @@ if(!dir.exists(resDir)) dir.create(resDir)
 fitting.space = "linear" ## linear or log2 transformed for expression matrix
 Use.mergedFractionMatrix = TRUE
 Use.mergedExpressionMatrix = FALSE
-Check.ProprotionMatrix.ExpressionMatrix.byHeatamp = FALSE
+Check.ProprotionMatrix.ExpressionMatrix = FALSE
 
 ######################################
 ######################################
@@ -68,43 +68,49 @@ if(!Use.mergedExpressionMatrix){
   ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
   ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
   colnames(xx) = c('whole.body', 'background', ncs) 
+  
+  ####################
+  ## here we transform the gene expression by e'= (expression-background)/background 
+  # then e' = 0 if e'<0 or e'<1; 
+  # this transformation is to scale the range for each gene so that all data fall into the same range and e' should still follow the positive constrain 
+  # meanwhile using ratio between expression and background to filter non-expressed ones  
+  ####################
+  expression = xx[, -c(1)]
+  
+  for(n in 1:ncol(expression)) 
+  {
+    if(fitting.space == "linear"){
+      expression[,n] = (expression[,n]-xx$background)/xx$background
+      ## use the e'> 1 as a threshold 
+      expression[which(expression[,n]<1),n] = 0
+      #expression[which(expression<1)] = 0
+    }else{
+      expression[,n] = log2(expression[,n]/xx$background)
+    }
+  }
+  
 }else{
   source('miRNAseq_functions.R')
   newExprM = expressionMatrix.grouping(xx) 
 }
 
 ####################
-## here we transform the gene expression by e'= (expression-background)/background 
-# then e' = 0 if e'<0 or e'<1; 
-# this transformation is to scale the range for each gene so that all data fall into the same range and e' should still follow the positive constrain 
-# meanwhile using ratio between expression and background to filter non-expressed ones  
-####################
-expression = xx[, -c(1:2)]
-for(n in 1:ncol(expression)) 
-{
-  if(fitting.space == "linear"){
-    expression[,n] = (expression[,n]-xx$background)/xx$background
-    ## use the e'> 1 as a threshold 
-    expression[which(expression[,n]<1),n] = 0
-    #expression[which(expression<1)] = 0
-  }else{
-    expression[,n] = log2(expression[,n]/xx$background)
-  }
-}
-
-mm = match((enriched.list), rownames(expression))
-expression.sel = t(expression[mm, ])
-#expression.sel = log2(expression.sel)
-
-####################
 ## double check the proprotion matrix and expression matrix
 ## match the sample order in the proprotion matrix and expression matrix 
 ## now manually (to change)
 ####################
+
+####################
+## select the miRNAs to analyze and match the samples for fraction matrix and expression matrix 
+####################
+mm = match((enriched.list), rownames(expression))
+expression.sel = t(expression[mm, ])
+#expression.sel = log2(expression.sel)
+
 index.sel = c(13, 2, 1, 3, 6, 5, 7, 8, 9, 4, 10, 11)
 proportions.sel = proportions[index.sel, ]
 
-if(Check.ProprotionMatrix.ExpressionMatrix.byHeatamp){
+if(Check.ProprotionMatrix.ExpressionMatrix){
   xx = proportions;
   xx[which(xx>0)] = 1
   yy = expression.sel[c(3, 2, 4, 10, 6, 5, 7, 8, 9, 11, 12, 1), ];
@@ -140,7 +146,6 @@ if(Check.ProprotionMatrix.ExpressionMatrix.byHeatamp){
   dev.off()
   
 }
-
 
 
 ######################################
