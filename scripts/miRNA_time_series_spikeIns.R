@@ -502,7 +502,7 @@ xx = res[jj, ]
 xx = average.biological.replicates(xx[,kk])
 xx = data.frame(log2(xx+10^-4))
 
-pdfname = paste0(resDir, "/heatmap_for_untreatedSamples_normSpikeIns", version.analysis, ".pdf")
+pdfname = paste0(resDir, "/heatmap_for_untreatedSamples_normSpikeIns_redtowhiteColor", version.analysis, ".pdf")
 pdf(pdfname, width=6, height = 20)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
@@ -510,9 +510,16 @@ par(mfrow=c(1, 1))
 library(pheatmap)
 library(RColorBrewer)
 
+colfunc <- colorRampPalette(c("white", "red"))
+#colfunc(10)
+#cols = colfunc(10)
+#cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+cols = colorRampPalette((brewer.pal(n = 7, name="OrRd")))(100)
+
 pheatmap(xx[order(-xx$L1.late_untreated), ], cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
          cluster_cols=FALSE,
-         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+         color = cols
+         )
 
 dev.off()
 
@@ -541,7 +548,10 @@ index.sel = unique(index.sel)
 yy = xx[index.sel, ]
 yy = data.frame(average.biological.replicates(yy))
 
-pdfname = paste0(resDir, "/heatmap_for_treatedSamples_normSpikeIns", version.analysis, ".pdf")
+#cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+cols = colorRampPalette((brewer.pal(n = 7, name="OrRd")))(100)
+
+pdfname = paste0(resDir, "/heatmap_for_treatedSamples_normSpikeIns_RedWhiteColor", version.analysis, ".pdf")
 pdf(pdfname, width=6, height = 12)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
@@ -550,21 +560,25 @@ par(mfrow=c(1, 1))
 yy0 = log2(yy)
 pheatmap(yy0, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
          cluster_cols=FALSE, main = "log2(spikeIns.norm)",
-         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+         color = cols)
 
-
+pheatmap(yy0, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+         cluster_cols=FALSE, main = "log2(spikeIns.norm)--scaled", scale = 'row',
+         color = cols)
 
 max.yy0 = apply(yy0, 1, max)
 yy1 = 2^(yy0 - max.yy0)
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
          cluster_cols=FALSE, main = "ratio to maximum",
-         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+         color = cols)
 
 dev.off()
 #enriched = enriched[, -c(1:2)]
 #tt = tt[-1]
 
+write.table(yy1, file = paste0(tabDir, paste0("ratio_to_max_for_spikeInsNormed", version.analysis, ".txt")), 
+            sep = "\t", quote = FALSE, col.names = TRUE, row.names = TRUE)
 
 #stats.mpu = matrix(NA, nrow = nrow(mpu), ncol=3*length(tt))
 #rownames(stats.mpu) = rownames(mpu)
