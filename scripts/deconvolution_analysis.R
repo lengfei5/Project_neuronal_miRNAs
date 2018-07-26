@@ -75,34 +75,28 @@ if(!Use.mergedExpressionMatrix){
   # this transformation is to scale the range for each gene so that all data fall into the same range and e' should still follow the positive constrain 
   # meanwhile using ratio between expression and background to filter non-expressed ones  
   ####################
-  expression = xx[, -c(1)]
   
-  for(n in 1:ncol(expression)) 
+  if(fitting.space == "linear")
   {
-    if(fitting.space == "linear"){
-      expression[,n] = (expression[,n]-xx$background)/xx$background
-      ## use the e'> 1 as a threshold 
-      expression[which(expression[,n]<1),n] = 0
-      #expression[which(expression<1)] = 0
-    }else{
-      expression[,n] = log2(expression[,n]/xx$background)
-    }
+    expression = xx[, -c(1)] # ignore the gene expression in the whole body
+  }else{
+    expression = xx[, -c(1, 2)]
+    expression = log2(expression/xx$background)
   }
-  
+    
 }else{
+  
   source('miRNAseq_functions.R')
   newExprM = expressionMatrix.grouping(xx) 
 }
 
-####################
-## double check the proprotion matrix and expression matrix
-## match the sample order in the proprotion matrix and expression matrix 
-## now manually (to change)
-####################
-
-####################
-## select the miRNAs to analyze and match the samples for fraction matrix and expression matrix 
-####################
+########################################################
+########################################################
+# Section: select the miRNAs to analyze 
+# Match the samples for fraction matrix and expression matrix
+# especailly for the fitting in the linear scale
+########################################################
+########################################################
 mm = match((enriched.list), rownames(expression))
 expression.sel = t(expression[mm, ])
 #expression.sel = log2(expression.sel)
@@ -110,6 +104,11 @@ expression.sel = t(expression[mm, ])
 index.sel = c(13, 2, 1, 3, 6, 5, 7, 8, 9, 4, 10, 11)
 proportions.sel = proportions[index.sel, ]
 
+####################
+## double check the proprotion matrix and expression matrix
+## match the sample order in the proprotion matrix and expression matrix 
+## now manually (to change)
+####################
 if(Check.ProprotionMatrix.ExpressionMatrix){
   xx = proportions;
   xx[which(xx>0)] = 1
@@ -146,7 +145,6 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
   dev.off()
   
 }
-
 
 ######################################
 ######################################
