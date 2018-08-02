@@ -194,6 +194,8 @@ require(glmnet)
 x=as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
 
+x = x >0 
+
 Example2test = c("lsy-6", "mir-791", "mir-793", "mir-790", "mir-1821", "mir-83", "mir-124")
 jj2test = match(Example2test, colnames(y))
 y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
@@ -204,34 +206,28 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
-
-#y=cbind(y1,y2)
-#rownames(y) = res.sel$gene
+alpha = 0.7 # 0.001 is the default value
 
 intercept=FALSE
 standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
 standardize.response=FALSE
-alpha = 0.005 # 0.001 is the default value
 grouped = FALSE
 
-for(n in 1:nrow(y))
+for(n in 1:ncol(y))
 {
   # n = 2
   cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
                    standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
-  
   fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
              standardize=standardize, standardize.response=standardize.response, intercept=intercept)
   
-  #optimal = which(fit$df<=70)
-  #optimal = max(optimal)
-  #optimal = which(cv.fit$lambda==cv.fit$lambda.min)
-  ## Adapted from @Mehrad Mahmoudian:
-  myCoefs <- coef(fit, s=cv.fit$lambda.min);
-  par(mfrow= c(1,1))
+  #par(mfrow= c(1,1))
   #plot(cv.fit)
-  plot(fit, label = TRUE)
-  plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+  #plot(fit, label = TRUE)
+  #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+  
+  #myCoefs <- coef(fit, s=cv.fit$lambda.min);
+  myCoefs = coef(cv.fit, s="lambda.min")
   res[,n] = as.numeric(myCoefs)[-1]
   
   cat("---------------\n", colnames(res)[n], ":\n", 
@@ -240,35 +236,20 @@ for(n in 1:nrow(y))
     
   #coef(cv.fit, s = "lambda.min")
   #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
-  ## [1]  1.4945869 -0.6907010 -0.7578129 -1.1451275 -0.7494350 -0.3418030 -0.8012926 -0.6597648 -0.5555719
-  ## [10] -1.1269725 -0.4375461
   #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
-  ## [1] "(Intercept)" "feature1"    "feature2"    "feature3"    "feature4"    "feature5"    "feature6"   
-  ## [8] "feature7"    "feature8"    "feature9"    "feature10"  
-  
-  ## Asseble into a data.frame
-  #myResults <- data.frame(
-  #  features = myCoefs@Dimnames[[1]], #intercept included
-  #  coefs    = myCoefs              #intercept included
-  #)
-  
-  #myResults
-  ##       features      coefs
-  
-  ## extract the fitting result
-  #colnames(x)[which(fit$beta[[1]][,optimal]!=0)]
-  #res = matrix(NA, nrow = ncol(x), ncol = ncol(y))
-  #colnames(res) = colnames(y)
-  #rownames(res) = colnames(x)
-  #for(n in 1:ncol(res))
-  #{
-  #  res[,n] = fit$beta[[n]][,optimal]
-  #}
-  #res = data.frame(res)
-  #cbind(rownames(res)[order(-res$lsy.6)],  res$lsy.6[order(-res$lsy.6)])
 }
 
+pdfname = paste0(resDir, "/res_deconv", 
+                 "_fitting.", fitting.space, "_alpha.", alpha,  version.analysis, ".pdf")
+pdf(pdfname, width=15, height = 6)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+par(mfrow=c(1, 1))
 
+pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+         cluster_cols=FALSE, main = paste0("alpha = ", alpha),
+         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+
+dev.off()
 
 
 
