@@ -206,7 +206,7 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
-alpha = 0.7 # 0.001 is the default value
+alpha = 0.6 # 0.001 is the default value
 
 intercept=FALSE
 standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
@@ -239,8 +239,8 @@ for(n in 1:ncol(y))
   #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
 }
 
-pdfname = paste0(resDir, "/res_deconv", 
-                 "_fitting.", fitting.space, "_alpha.", alpha,  version.analysis, ".pdf")
+pdfname = paste0(resDir, "/deconv_test/res_deconv", version.analysis, 
+                 "_fitting.", fitting.space, "_alpha.", alpha, ".pdf")
 pdf(pdfname, width=15, height = 6)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
@@ -250,7 +250,6 @@ pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_col
          color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
 
 dev.off()
-
 
 
 ######################################

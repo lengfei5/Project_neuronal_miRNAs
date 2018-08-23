@@ -19,7 +19,7 @@ Save.Processed.Tables = TRUE
 ## Section: load count tables for miRNAs and prepare statistics for piRNA and siRNAs for normalization
 ######################################
 ######################################
-load(file = paste0(RdataDir, 'Design_Raw_readCounts_', version.table, '.Rdata'))
+load(file = paste0('../results/miRNAs_neurons_v1_2018_03_07/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
 source("miRNAseq_functions.R")
 
 Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
@@ -53,7 +53,7 @@ if(Merge.techinical.replicates.N2){
 if(Filter.lowly.expressed.using.predefined.miRNA.list){
   list.expressed = read.csv(paste0("../data/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
   # prepare old llist
-  list.expressed = find.mature.ones.for.expressed.miRNAs(list.expressed)
+  list.expressed = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
   expressed.miRNAs = data.frame(list.expressed[, c(1:3)], stringsAsFactors = FALSE)
 }
 
@@ -66,15 +66,17 @@ raw = floor(raw)
 rownames(raw) = all$gene
 library.sizes = apply(raw, 2, sum)
 
-#cpm = my.cpm.normalization(raw)
-
 expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
 mm = match(expressed.miRNAs$miRNA, all$gene)
 countData = raw[mm, ]
 rownames(countData) = expressed.miRNAs$gene
 
-## filter the samples unrelevant (non-neuron samples, henn1-mutant background)
-kk = which(design$tissue.cell=="Glial.cells" | design$tissue.cell == "CEPsh" | design$genotype == "henn1.mutant")
+###############################
+# filter the samples unrelevant (non-neuron samples, henn1-mutant background)
+###############################
+kk =  unique(c(which(design$tissue.cell=="Glial.cells" | design$tissue.cell == "CEPsh" | 
+             design$genotype == "henn1.mutant"), grep("L3", design$tissue.cell)))
+
 if(length(kk)>0){
   design.matrix = design[-kk, ]
   countData = countData[, -kk]

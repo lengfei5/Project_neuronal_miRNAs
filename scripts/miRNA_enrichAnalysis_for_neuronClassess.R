@@ -80,7 +80,7 @@ if(Processing.design.matrix){
 }
 
 ## make the data table
-xlist<-list.files(path=paste0(dataDir), pattern = "*.txt", full.names = TRUE) ## list of data set to merge
+xlist <- list.files(path=paste0(dataDir), pattern = "*.txt", full.names = TRUE) ## list of data set to merge
 
 if(length(xlist)>1){
   all = NULL
@@ -162,15 +162,16 @@ Save.Comparison = TRUE
 Check.data.quality = TRUE
 
 #for(n in 1:length(tcs))
-for(n in c(16))
+for(n in c(1))
 {
-  # n = 16
+  # n = 1
   specifity = tcs[n];
 
   specDir = paste0(resDir, "/", specifity, "/")
   if(!dir.exists(specDir)){dir.create(specDir)}
   
   kk = which(design$tissue.cell==specifity)
+  kk = kk[order(design$promoter[kk])]
   
   if(specifity == "CEPsh.L3"){
     index.N2 = which(design$genotype=="WT" & design$tissue.cell == "whole.body.L3")
@@ -180,8 +181,7 @@ for(n in c(16))
   genos = unique(design$genotype[kk]);
   promoters = unique(design$promoter[kk]); 
   
-  if(any(genos=='WT') & specifity != "whole.body")  
-  {
+  if(any(genos=='WT') & specifity != "whole.body") {
     kk = unique(c(kk, index.N2))
   }
   
@@ -293,7 +293,7 @@ for(n in c(16))
                main=paste0(cc, "--", prot, " (NOT using N2)"))
           abline(v=0, lwd=2.0, col='black')
           abline(h=c(5, 10), lwd=1.0, lty=2, col='blue')
-          text(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), rownames(res)[kk.mature], cex=1.0, offset = 0.3, pos = 3)
+          text(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), rownames(res)[kk.mature], cex=0.7, offset = 0.3, pos = 3)
           
           ## the one showing N2-specific treatment effect is smaller than WT-specific treatment effect 
           ## (refer to the DEseq2 mannul or tutorial https://www.bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html)
@@ -302,6 +302,7 @@ for(n in c(16))
           ## merge both res1 and res2
           res1 = as.data.frame(res); 
           res2 = as.data.frame(res2);
+          
           ## change the sign (log2(FC.WT.treated) - log2(FC.WT.untreated)) - (log2(FC.N2.treated) - log2(FC.N2.untreated))
           res2$log2FoldChange = -res2$log2FoldChange; 
           ii.enrich = which(res1$log2FoldChange>0) 
@@ -321,7 +322,7 @@ for(n in c(16))
              cex=0.8, main=paste0(cc, "--", prot))
         abline(v=seq(-1, 1, by=0.5), lwd=1.0, col='gray')
         abline(h=c(3, 5, 10), lwd=1.0, lty=2, col='blue')
-        text(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), rownames(res)[kk.mature], cex=1.0, offset = 0.3, pos = 3)
+        text(res$log2FoldChange[kk.mature], -log10(res$pvalue[kk.mature]), rownames(res)[kk.mature], cex=0.7, offset = 0.3, pos = 3)
         #ii = match(c('lsy-6', 'mir-791', 'mir-790', 'mir-793'), rownames(res));
         #points(res$log2FoldChange[ii], -log10(res$pvalue)[ii], cex=1.5, col='darkgreen', pch=16)
         
@@ -352,7 +353,11 @@ for(n in c(16))
  
 }
 
-
+########################################################
+########################################################
+# Section: some additional plots or test
+########################################################
+########################################################
 Plot.for.presentation = FALSE
 if(Plot.for.presentation){
   yy = xx[grep('mir-789-2', rownames(xx)), ]
@@ -369,6 +374,22 @@ if(Plot.for.presentation){
     }
   }
 }
+
+
+Compare.rab3_wt_vs_henn1.mutant = FALSE
+if(Compare.rab3_wt_vs_henn1.mutant){
+  xx = read.csv(paste0(specDir, "miRNA_Enrichment_Analysis_Pan.neurons_henn1.mutant_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv"), header = TRUE)
+  yy = read.csv(paste0(specDir, "miRNA_Enrichment_Analysis_Pan.neurons_WT_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv"), header = TRUE)
+  
+  mm = match(xx[,1], yy[,1])
+  yy = yy[mm, ]
+  
+  kk = c(1:40)
+  plot(xx$log2FoldChange[kk], yy$log2FoldChange.without.N2[kk])
+  abline(0, 1, lwd=2.0, col='red')
+  
+}
+  
 
 ####################
 ## log session info

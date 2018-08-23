@@ -13,7 +13,7 @@ source('miRNAseq_functions.R')
 
 ### data verision and analysis version   
 version.Data = 'miRNAs_timeSeries_spikeIn_R5922_R6016';
-version.analysis = paste0("_", version.Data, "_20180719")
+version.analysis = paste0("_", version.Data, "_20180802")
 
 ### Directories to save results 
 design.file = "../exp_design/Libaries_time_series_spikIns.xlsx"
@@ -510,7 +510,7 @@ par(mfrow=c(1, 1))
 library(pheatmap)
 library(RColorBrewer)
 
-colfunc <- colorRampPalette(c("white", "red"))
+#colfunc <- colorRampPalette(c("white", "red"))
 #colfunc(10)
 #cols = colfunc(10)
 #cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
@@ -548,14 +548,22 @@ index.sel = unique(index.sel)
 yy = xx[index.sel, ]
 yy = data.frame(average.biological.replicates(yy))
 
-#cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-cols = colorRampPalette((brewer.pal(n = 7, name="OrRd")))(100)
+nb.cells = c(230, 293, 301, 302)
+nb.cells = nb.cells/min(nb.cells)
 
-pdfname = paste0(resDir, "/heatmap_for_treatedSamples_normSpikeIns_RedWhiteColor", version.analysis, ".pdf")
+for(n in 1:ncol(yy))
+{
+  yy[,n] = yy[,n]*nb.cells[n]
+}
+
+pdfname = paste0(resDir, "/heatmap_for_treatedSamples_normSpikeIns", version.analysis, ".pdf")
 pdf(pdfname, width=6, height = 12)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
 # par(mfcol=c(1, 1))
+
+cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+#cols = colorRampPalette((brewer.pal(n = 7, name="OrRd")))(100)
 
 yy0 = log2(yy)
 pheatmap(yy0, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
@@ -566,11 +574,16 @@ pheatmap(yy0, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
          cluster_cols=FALSE, main = "log2(spikeIns.norm)--scaled", scale = 'row',
          color = cols)
 
-max.yy0 = apply(yy0, 1, max)
-yy1 = 2^(yy0 - max.yy0)
+## scale expression into 0 and 1
+range.scale = function(x){return((x-min(x))/(max(x)-min(x)));}
+
+yy1 = t(apply(as.matrix(yy), 1, range.scale))
+
+#max.yy0 = apply(yy0, 1, max)
+#yy1 = 2^(yy0 - max.yy0)
 
 pheatmap(yy1, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
-         cluster_cols=FALSE, main = "ratio to maximum",
+         cluster_cols=FALSE, main = "scaled to 0 and 1",
          color = cols)
 
 dev.off()
