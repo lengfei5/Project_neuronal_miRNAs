@@ -1,5 +1,5 @@
 #### Functions
-process.countTable = function(all, design, select.Total.count = TRUE)
+process.countTable = function(all, design, select.Total.count = TRUE, time.series = FALSE)
 {
   newall = data.frame(as.character(all[,1]), stringsAsFactors = FALSE)
   
@@ -25,7 +25,11 @@ process.countTable = function(all, design, select.Total.count = TRUE)
   }
   
   colnames(newall)[1] = "gene";
-  colnames(newall)[-1] = paste0(design$stage, "_", design$treatment, "_", design$SampleID)
+  if(time.series){
+    colnames(newall)[-1] = paste0(design$stage, "_", design$treatment, "_", design$SampleID)
+  }else{
+    colnames(newall)[-1] = paste0(design$genotype, "_", design$tissue.cell, "_", design$treatment, "_",  design$SampleID)
+  }
   
   return(newall)
 }
@@ -873,5 +877,92 @@ expressionMatrix.grouping = function(xx, using.logscale = TRUE)
   # Print the result
   print(gap_stat, method = "firstmax")
   
+}
+
+Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats, countData)
+{
+  #source('RNAseq_Quality_Controls.R')
+  #pairs(stats, lower.panel=NULL, upper.panel=panel.fitting)
+  plot(library.sizes, stats$piRNA, log = 'xy')
+  plot(library.sizes, stats$siRNA, log = 'xy')
+  
+  lims =  range(c(stats$piRNA, stats$siRNA))
+  plot(stats$piRNA, stats$siRNA, log='xy', ylim =lims, xlim = lims)
+  #abline(log(mean(stats$siRNA/stats$piRNA)),  lwd=2.0, col='red')
+  
+  ###############################
+  # compare spike-in normalization and piRNA-normalization 
+  ###############################
+  spikes = read.delim(paste0("../data/normalized_piRNAs/R6585_spikeIns_count_table.txt"), sep="\t", header = TRUE, row.names = 1)
+  spikes = t(as.matrix(spikes))
+  spikes = data.frame(gene=rownames(spikes), spikes, stringsAsFactors = FALSE)
+  
+  index.samples.with.spikeIns = which(design$tissue.cell=="Pan.neurons" & design$genotype=="WT")
+  spikes = process.countTable(all=spikes, design = design[index.samples.with.spikeIns, ], select.Total.count = FALSE)
+  rownames(spikes) = spikes$gene;
+  spikes = spikes[, -1]
+  
+  mm = match(colnames(spikes), colnames(countData))
+
+  aa = rbind(as.matrix(spikes), as.matrix(countData[,mm]));
+  stat = stats[mm, ]
+  
+  index.spikeIn = grep("spikeIn", rownames(aa))[c(1:8)]
+  
+  # here the concentration is amol per mug of total RNA
+  #concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5)*100 
+  concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25)*100
+  ## calculate scaling factor using spike-ins
+  #source("miRNAseq_functions.R")
+  
+  par(mfrow=c(2,2))
+  
+  res.spike.in = calculate.scaling.factors.using.spikeIns(aa, concentrations = concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+  
+  cpm = res.spike.in$cpm;
+  res = res.spike.in$normalization.spikeIn
+  colnames(cpm) = paste0(colnames(cpm), ".cpm")
+  colnames(res) = paste0(colnames(res), ".amol.per.mugRNA.normBySpikeIns")
+  
+  ss = apply(aa, 2, sum)
+  
+  ## double check the cpm calculated by myself 
+  par(mfrow=c(1,1))
+  plot(aa[,1]/ss[1]*10^6, cpm[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+  
+  #plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
+  sf.p = stat$piRNA/10^6
+  sf.p = sf.p/sf.p[1]
+  sf.s = res.spike.in$norms4DESeq2
+  sf.s = sf.s/sf.s[1]
+  
+  par(mfrow=c(1,1))
+  plot(res.spike.in$norms4DESeq2, piRNAs, log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=2.0,
+       xlim = c(1, 150), ylim = c(0.01, 50))
+  abline(0, (median(as.numeric(piRNAs)/as.numeric(res.spike.in$norms4DESeq2))), lwd=2.0, col="red")
+  #text(res.spike.in$norms4DESeq2, piRNAs, labels = colnames(aa), offset = 0., pos = 1)
+  
+  ### normalization counts using piRNA data
+  sizefactors = as.numeric(stat$piRNA)
+  cpm.piRNA = aa
+  for(n in 1:ncol(cpm.piRNA))
+  {
+    cpm.piRNA[,n] = aa[,n]/sizefactors[n]*10^6
+  }
+  
+  par(mfrow=c(2,2))
+  for(n in 1:2)
+  {
+    plot(res[, c((n*2-1), (2*n))], log='xy', main = 'spikeIns.norm', xlab = colnames(res)[(2*n-1)],
+         ylab = colnames(res)[2*n], cex=0.7)
+    abline(0, 1, lwd=2.0, col = 'red')
+    
+    plot(cpm.piRNA[, c((n*2-1), (2*n))], log='xy', main = 'piRNA.norm', xlab = colnames(cpm.piRNA)[(2*n-1)],
+         ylab = colnames(cpm.piRNA)[2*n], cex=0.7)
+    abline(0, 1, lwd=2.0, col = 'red')
+  }
+  
+ 
   
 }
+

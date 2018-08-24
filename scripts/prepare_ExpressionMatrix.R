@@ -68,8 +68,8 @@ library.sizes = apply(raw, 2, sum)
 
 expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
 mm = match(expressed.miRNAs$miRNA, all$gene)
-countData = raw[mm, ]
-rownames(countData) = expressed.miRNAs$gene
+raw = raw[mm, ]
+rownames(raw) = expressed.miRNAs$gene
 
 ###############################
 # filter the samples unrelevant (non-neuron samples, henn1-mutant background)
@@ -79,7 +79,7 @@ kk =  unique(c(which(design$tissue.cell=="Glial.cells" | design$tissue.cell == "
 
 if(length(kk)>0){
   design.matrix = design[-kk, ]
-  countData = countData[, -kk]
+  countData = raw[, -kk]
   library.sizes = library.sizes[-kk]
 }
 
@@ -133,15 +133,21 @@ stats = stats[, mm]
 colnames(stats) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
 stats = data.frame(t(stats))
 
-source('RNAseq_Quality_Controls.R')
-#pairs(stats, lower.panel=NULL, upper.panel=panel.fitting)
 
-plot(library.sizes, stats$piRNA, log = 'xy')
-plot(library.sizes, stats$siRNA, log = 'xy')
+Compare.piRNA.siRNA.spikeIns.as.scaling.factors = FALSE
+if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
+  source("miRNAseq_functions.R")
+  
+  pdfname = paste0(resDir, "/Compare_piRNAs_siRNAs_spikeIns_for_scalingFactorinNormalization", ".pdf")
+  pdf(pdfname, width=10, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(mfrow=c(1, 1))
+  
+  Compare.piRNA.siRNA.spikeIns.for.scaling.factors(library.sizes, stats, countData)
+  
+  dev.off()
 
-lims =  range(c(stats$piRNA, stats$siRNA))
-plot(stats$piRNA, stats$siRNA, log='xy', ylim =lims, xlim = lims)
-#abline(log(mean(stats$siRNA/stats$piRNA)),  lwd=2.0, col='red')
+}
 
 ####################
 ## Normalize the data using piRNAs 
