@@ -133,6 +133,7 @@ stats = stats[, mm]
 colnames(stats) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
 stats = data.frame(t(stats))
 
+save(stats, countData, design.matrix, file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
 
 Compare.piRNA.siRNA.spikeIns.as.scaling.factors = FALSE
 if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
