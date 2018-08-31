@@ -162,9 +162,9 @@ Save.Comparison = TRUE
 Check.data.quality = TRUE
 
 #for(n in 1:length(tcs))
-for(n in c(1))
+for(n in c(17))
 {
-  # n = 1
+  # n = 17
   specifity = tcs[n];
 
   specDir = paste0(resDir, "/", specifity, "/")
@@ -350,7 +350,7 @@ for(n in c(1))
   }
   
   dev.off();
- 
+  
 }
 
 ########################################################

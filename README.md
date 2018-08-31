@@ -2,6 +2,12 @@
 
 This reprosition is for the deconvolution analysis for Chiara's project
 
+### To-do
+  [] understand the difference between the WT and henn-1 mutant, because there is a good correlation between the log2FC in both genotypes. The starting point
+    will be to compare the henn1-mutant without promoter, henn1-mutant with ubiquitous promoter and N2 without promoter (with ubiquitous promoter data ?? not 
+    sure exits)
+  
+
 ### Deconvolution analysis
 `deconvolution_analysis.R`
 
@@ -39,8 +45,10 @@ This reprosition is for the deconvolution analysis for Chiara's project
     This will be the same for the last sample to come.
     
   - 20180831: 
-    the last sample of unc-3 is sequenced; so if all samples look good, the data should be complete. 
-    IMPORTANT NOTE: after discussion with Thomas, there is a way to extract read counts for each piRNAs; the count information is in the tables like
-    `72762_ATCACG_CCRBHANXX_6_20180822B_20180822.trimmed.virus.bam.tailor.bam.seqCnt.txt.gz`; An easy solution suggested by Thomas is to modify the 
-    one of R codes, by specifiying the piRNAs together with miRNAs; but anyway this needs to be double checked. 
+    - the last sample of unc-3 is sequenced; so if all samples look good, the data should be complete. 
+    - IMPORTANT NOTE: after discussion with Thomas, there is a way to extract read counts for each piRNAs; the count information is in the tables like
+      `72762_ATCACG_CCRBHANXX_6_20180822B_20180822.trimmed.virus.bam.tailor.bam.seqCnt.txt.gz`; An easy solution suggested by Thomas is to modify the 
+      one of R codes, by specifiying the piRNAs together with miRNAs; but anyway this needs to be double checked. 
+    
+    
     
