@@ -13,6 +13,7 @@ version.table = "miRNAs_neurons_v1_2018_03_07"
 resDir = "../results/tables_for_decomvolution"
 if(!dir.exists(resDir)) dir.create(resDir)
 Save.Processed.Tables = TRUE
+version.analysis = "neuronal_miRNAs_20180824"
 
 ######################################
 ######################################
@@ -62,9 +63,9 @@ if(Filter.lowly.expressed.using.predefined.miRNA.list){
 ####################
 raw = as.matrix(all[, -1])
 raw[which(is.na(raw))] = 0
+library.sizes = apply(raw, 2, sum)
 raw = floor(raw)
 rownames(raw) = all$gene
-library.sizes = apply(raw, 2, sum)
 
 expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
 mm = match(expressed.miRNAs$miRNA, all$gene)
@@ -85,7 +86,7 @@ if(length(kk)>0){
 
 ######################################
 ######################################
-## Section: calculate scaling factors using piRNAs or siRNAs and scale cpm using them and test if it works
+## Section: import and reform the piRNAs, siRNAs statistics for all samples
 ######################################
 ######################################
 stat.list = list.files(path = statDir, pattern = "*_cnt.typeHierarchy.txt", full.names = TRUE)
@@ -133,18 +134,30 @@ stats = stats[, mm]
 colnames(stats) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
 stats = data.frame(t(stats))
 
-save(stats, countData, design.matrix, file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
+save(stats, countData, design.matrix, file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
 
+########################################################
+########################################################
+# Section: Normalization with piRNAs
+# double check sample quality
+# calculate scaling factors using piRNAs or siRNAs and scale cpm using them 
+# check again the sample qualities after normalization 
+########################################################
+########################################################
 Compare.piRNA.siRNA.spikeIns.as.scaling.factors = FALSE
 if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
-  source("miRNAseq_functions.R")
   
+  load(file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
   pdfname = paste0(resDir, "/Compare_piRNAs_siRNAs_spikeIns_for_scalingFactorinNormalization", ".pdf")
-  pdf(pdfname, width=10, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(1, 1))
+  pdf(pdfname, width=20, height = 18)
+  par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
-  Compare.piRNA.siRNA.spikeIns.for.scaling.factors(library.sizes, stats, countData)
+  # common quality control normalized by DESeq2 
+  source("RNAseq_Quality_Controls.R")
+  Check.RNAseq.Quality(read.count=countData, design.matrix = design.matrix[, c(1, 3,5)], lowlyExpressed.readCount.threshold = 0)
+  
+  source("miRNAseq_functions.R")
+  Compare.piRNA.siRNA.spikeIns.for.scaling.factors(library.sizes, stats, countData, design.matrix)
   
   dev.off()
 
@@ -173,14 +186,14 @@ save(stats, countData, design.matrix, cpm.piRNA, file = paste0(RdataDir, 'piRAN_
 load(file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
 
 source("miRNAseq_functions.R")
-design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4))
+design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(15,2), rep(16, 2))
 #method.sel = 'linear.model'
 ## remove batch effect by scaling the untreated samples using N2 as the reference
 cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'linear.model')
 cpm.piRNA.bc.limma = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'limma')
 cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'combat')
 
-pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval", ".pdf")
+pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval_",  version.analysis, ".pdf")
 pdf(pdfname, width=16, height = 10)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 #par(mfrow=c(1, 1))
@@ -240,7 +253,8 @@ expression.sel = log2(expression.sel)
 library("pheatmap")
 library("RColorBrewer")
 
-pdfname = paste0(resDir, "/heatmap_ExpreMatrix_piRNAnormalization_for_12samples_66genes_with_clusters_for_neuronClasses", ".pdf")
+pdfname = paste0(resDir, "/heatmap_ExpreMatrix_piRNAnormalization_for_13samples_66genes_with_clusters_for_neuronClasses", 
+                 version.analysis, ".pdf")
 pdf(pdfname, width=14, height = 6)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))

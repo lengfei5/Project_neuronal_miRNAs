@@ -1,7 +1,7 @@
 ############# 
 ##### Collection of functions for RNA-seq data
 ############# 
-Check.RNAseq.Quality = function(read.count, design.matrix, norms = NULL)
+Check.RNAseq.Quality = function(read.count, design.matrix, norms = NULL, lowlyExpressed.readCount.threshold = NULL)
 {
   require(lattice);
   require(ggplot2)
@@ -44,7 +44,8 @@ Check.RNAseq.Quality = function(read.count, design.matrix, norms = NULL)
   conds = factor(paste0(colnames(design.matrix)[-1], collapse = " + "))
   eval(parse(text = paste0("dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ ", conds, ")")))
   #dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ condition + time)
-  dds <- dds[ rowSums(counts(dds)) > 10, ]
+  if(is.null(lowlyExpressed.readCount.threshold))  lowlyExpressed.readCount.threshold = 10
+  dds <- dds[ rowSums(counts(dds)) >= lowlyExpressed.readCount.threshold, ]
   if(is.null(norms)){
     dds <- estimateSizeFactors(dds)
   }else{
@@ -75,7 +76,8 @@ Check.RNAseq.Quality = function(read.count, design.matrix, norms = NULL)
   xx[which(xx==0)] = NA
   M <- cor(xx, use = "na.or.complete")
   #corrplot(M, method="circle", type = 'upper', order="hclust")
-  corrplot(M, method="ellipse", order="hclust", tl.cex=1.2, cl.cex=0.7, tl.col="black", addrect=ceiling(ncol(xx)/2), col=col1(100), rect.col=c('green'), rect.lwd=2.0)
+  corrplot(M, method="ellipse", order="hclust", tl.cex=1.2, cl.cex=0.7, tl.col="black", 
+           addrect=ceiling(ncol(xx)/2), col=col1(100), rect.col=c('green'), rect.lwd=2.0)
   
   ### count transformation using vsd
   library("dplyr")
@@ -167,7 +169,7 @@ panel.cor <- function(x, y, digits=2, prefix="", cex.cor)
   text(.8, .8, Signif, cex=cex, col=2) 
 }
 
-panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 0.5, col='black') 
+panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 1.0, col='black') 
 {
   #x = yy[,1];y=yy[,2];
   #kk = which(x>0 & y>0); x=x[kk];y=y[kk]
@@ -176,13 +178,13 @@ panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 0.5, col='black
   abline(0, 1, lwd=1.5, col='red')
   R = cor(x, y, use="na.or.complete", method='pearson')
   text(lims[2]*0.2, lims[2]*0.9, paste0('R = ', signif(R, d=2)), cex=1., col='red')
-  jj = which(!is.na(x) & !is.na(y))
-  fit = lm(y[jj] ~ x[jj])
+  #jj = which(!is.na(x) & !is.na(y))
+  #fit = lm(y[jj] ~ x[jj])
   #slope=summary(fit)$coefficients[1]
-  slope = fit$coefficients[2]
-  intercept = fit$coefficients[1]
-  pval=summary(fit)$coefficients[4]
-  abline(intercept, slope, lwd=1.2, col='darkblue', lty=3)
+  #slope = fit$coefficients[2]
+  #intercept = fit$coefficients[1]
+  #pval=summary(fit)$coefficients[4]
+  #abline(intercept, slope, lwd=1.2, col='darkblue', lty=3)
   #text(lims[2]*0.1, lims[2]*0.7, paste0('slop = ', signif(slope, d=2)), cex=1., col='blue')
   #text(lims[2]*0.1, lims[2]*0.6, paste0('pval = ', signif(pval, d=2)), cex=1., col='blue')
   #ok <- is.finite(x) & is.finite(y)
@@ -190,4 +192,15 @@ panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 0.5, col='black
   #lines(stats::lowess(x[ok], y[ok], f = span, iter = iter), 
   #        col = col.smooth, ...)
 }
+
+plot.pair.comparison.plot = function(xx, linear.scale = TRUE, main = "pairwise.comparision"){
+  yy = as.matrix(xx)
+  if(linear.scale){
+    yy[which(yy==0)] = NA;
+    yy = log2(yy)
+  }
+  pairs(yy, lower.panel=NULL, upper.panel=panel.fitting, main = main)
+  
+}
+
 
