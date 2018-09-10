@@ -375,19 +375,60 @@ if(Plot.for.presentation){
   }
 }
 
-
+###############################
+# compare the wt and henn1.mutant and the relationship    
+###############################
 Compare.rab3_wt_vs_henn1.mutant = FALSE
 if(Compare.rab3_wt_vs_henn1.mutant){
+  test.Dir = paste0(resDir, "/tables/ASE.neurons")
+  xlist = list.files(path = test.Dir, pattern = "*.csv", full.names = TRUE)
+  xlist = xlist[grep("_Mature", xlist)]
   
-  xx = read.csv(paste0(specDir, "miRNA_Enrichment_Analysis_Pan.neurons_henn1.mutant_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv"), header = TRUE)
-  yy = read.csv(paste0(specDir, "miRNA_Enrichment_Analysis_Pan.neurons_WT_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv"), header = TRUE)
+  xx = read.csv(xlist[grep("henn1.mutant", xlist)], header = TRUE, row.names = 1)
+  jj1 = intersect(grep("DESeq2", colnames(xx)), grep("_treated", colnames(xx)))
+  jj2 = intersect(grep("DESeq2", colnames(xx)), grep("_untreated", colnames(xx)))
+  plot(log2(apply(as.matrix(xx[, jj1]), 1, mean)/apply(as.matrix(xx[, jj2]), 1, mean)), xx$log2FoldChange, 
+       xlab = "log2FC from my own calculation", ylab = "log2FC from DESeq2", main = basename(test.Dir))
+  abline(0, 1, lwd=2.0, col='red')
   
-  mm = match(xx[,1], yy[,1])
+  yy = read.csv(xlist[grep("WT", xlist)], header = TRUE, row.names = 1)
+  
+  mm = match(rownames(xx), rownames(yy))
   yy = yy[mm, ]
   
-  kk = c(1:40)
-  plot(xx$log2FoldChange[kk], yy$log2FoldChange.without.N2[kk])
+  source("miRNAseq_functions.R")
+  
+  kk = intersect(grep("DESeq2", colnames(yy)), grep("N2", colnames(yy)))
+  fc.N2 = log2(apply(yy[, kk[grep("_treated_", colnames(yy)[kk])]], 1, mean)/
+                apply(yy[, kk[grep("_untreated_", colnames(yy)[kk])]], 1, mean))
+  
+  kk = intersect(grep("DESeq2", colnames(yy)), grep("WT", colnames(yy)))
+  fc.wt = log2(apply(yy[, kk[grep("_treated_", colnames(yy)[kk])]], 1, mean)/
+                 apply(yy[, kk[grep("_untreated_", colnames(yy)[kk])]], 1, mean))
+  
+  par(mfrow=c(2, 2))
+  plot(xx$log2FoldChange, fc.wt, xlab='henn1.mutant', ylab = "WT")
   abline(0, 1, lwd=2.0, col='red')
+  #text( xx$log2FoldChange, fc.wt, rownames(xx), offset = 0.7, cex = 0.5)
+  
+  #kk = c(1:40)
+  #plot(xx$log2FoldChange, yy$log2FoldChange.without.N2)
+  #abline(0, 1, lwd=2.0, col='red')
+  
+  plot(xx$log2FoldChange, yy$log2FoldChange, ylim = c(-4, 10))
+  abline(0, 1, lwd=2.0, col='red')
+  
+  plot(fc.N2, fc.wt, xlab='N2', ylab = "WT")
+  abline(0, 1, lwd=2.0, col='red')
+  
+  #jj = which(xx$log2FoldChange- fc.wt<0)
+  #plot()
+  
+  plot(xx$log2FoldChange, (fc.wt-fc.N2), xlab='henn1.mutant', ylab = "WT-N2")
+  abline(0, 1, lwd=2.0, col='red')
+  #text( xx$log2FoldChange, fc.wt, rownames(xx), offset = 0.7, cex = 0.5)
+  
+  
   
 }
   
