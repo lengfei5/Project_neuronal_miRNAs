@@ -5,7 +5,8 @@ This reprosition is for the deconvolution analysis for Chiara's project
 ### To-do
   - [x] Understand the difference between the WT and henn-1 mutant, because there is a good correlation between the log2FC in both genotypes. The starting point
     will be to compare the henn1-mutant without promoter, henn1-mutant with ubiquitous promoter and N2 without promoter (with ubiquitous promoter data ?? not sure exits)
-    - the conclusion is not very clear; because the highly enriched guys are not very highly expressed in the untreated samples, suggesting they are not simply due to the unefficient removal for unmethylated ones in the oxidation step      
+    - the conclusion is not very clear; because the highly enriched guys are not very highly expressed in the untreated samples, suggesting they are not simply due to the unefficient removal for unmethylated ones in the oxidation step
+    - But it is clear that in the WT background, since the oxidation is shared by more species, e.g. siRNAs, piRNAs; consequently, the oxidation efficiency is lower for miRNAs. So the log2FC in WT is always lower than the log2FC in the henn1.mutant. But there are are some particular guys, which can be highly methylated (probably) already in the background. The reason could be the Chiara's assumption.
     
   - [ ] Double check the batch correction works
   
