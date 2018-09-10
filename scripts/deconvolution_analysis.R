@@ -14,11 +14,12 @@ version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
 
-version.analysis = "_20180802"
+version.analysis = "_20180904"
 
 resDir = "../results/decomvolution_results"
 if(!dir.exists(resDir)) dir.create(resDir)
 
+Data.complete = TRUE
 fitting.space = "linear" ## linear or log2 transformed for expression matrix
 Use.mergedFractionMatrix = TRUE 
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
@@ -104,7 +105,8 @@ if(Manually.unifiy.sample.names.forMatrix){
   if(fitting.space == "linear"){
     expression = t(expression)
     rownames(expression) = c( "background", "ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
-                                  "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42")
+                              "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42", 
+                              "Pan.neurons", "unc.3")
     yy = proportions;
     yy = rbind(rep(0, ncol(proportions)), proportions)
     yy = cbind(rep(1, nrow(yy)), yy)
@@ -127,7 +129,7 @@ if(Manually.unifiy.sample.names.forMatrix){
 ###############################
 # select genes of intereset and match sample orders
 ###############################
-load(file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed.Rdata"))
+load( file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", version.Fraction.Matrix,"_", version.ExprsMatrix, ".Rdata"))
 load(file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.EnrichscoreMatrix, ".Rdata"))
 enriched.list = colnames(enrich.matrix.sel)
 #enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
@@ -139,6 +141,13 @@ expression.sel = expression[, mm]
 sels = match(rownames(expression.sel), rownames(proportions))
 proportions.sel = proportions[sels, ]
 
+if(Data.complete){
+  jj = match(rownames(proportions), rownames(proportions.sel))
+  proportions.sel = proportions.sel[jj, ]
+  expression.sel = expression.sel[jj, ]
+  
+}
+
 ####################
 ## double check the proprotion matrix and expression matrix
 ## match the sample order in the proprotion matrix and expression matrix 
@@ -147,6 +156,7 @@ proportions.sel = proportions[sels, ]
 if(Check.ProprotionMatrix.ExpressionMatrix){
   xx = proportions.sel;
   xx[which(xx>0)] = 1
+
   yy = expression.sel;
   #yy = expression.sel[c(3, 2, 4, 10, 6, 5, 7, 8, 9, 11, 12, 1), ];
   #yy = proportions[c(index.sel, 12, 14), ]
@@ -160,9 +170,14 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
   par(mfrow=c(1, 1))
   # par(mfcol=c(1, 1))
   
-  if(fitting.space == 'linear') {logaxis = 'xy'; yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
+  if(fitting.space == 'linear') {
+    logaxis = 'xy'; 
+    yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
+    
   }else{logaxis = ''}
   
+  xx = xx[-1, -1];
+  yy = yy[-1,  ]
   
   pheatmap(xx, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
            cluster_cols=TRUE, 

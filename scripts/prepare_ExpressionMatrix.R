@@ -13,7 +13,7 @@ version.table = "miRNAs_neurons_v1_2018_03_07"
 resDir = "../results/tables_for_decomvolution"
 if(!dir.exists(resDir)) dir.create(resDir)
 Save.Processed.Tables = TRUE
-version.analysis = "neuronal_miRNAs_20180824"
+version.analysis = "neuronal_miRNAs_20180831"
 
 ######################################
 ######################################
@@ -148,7 +148,8 @@ Compare.piRNA.siRNA.spikeIns.as.scaling.factors = FALSE
 if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
   
   load(file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
-  pdfname = paste0(resDir, "/Compare_piRNAs_siRNAs_spikeIns_for_scalingFactorinNormalization", ".pdf")
+  
+  pdfname = paste0(resDir, "/Compare_piRNAs_siRNAs_spikeIns_for_scalingFactorinNormalization", version.analysis,  ".pdf")
   pdf(pdfname, width=20, height = 18)
   par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
@@ -186,7 +187,7 @@ save(stats, countData, design.matrix, cpm.piRNA, file = paste0(RdataDir, 'piRAN_
 load(file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
 
 source("miRNAseq_functions.R")
-design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(15,2), rep(16, 2))
+design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(15,2), rep(16, 2), rep(17, 4))
 #method.sel = 'linear.model'
 ## remove batch effect by scaling the untreated samples using N2 as the reference
 cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'linear.model')
@@ -212,6 +213,13 @@ dev.off()
 ####################
 ## average the biological replicates
 cpm.piRNA.bc = cpm.piRNA.bc.combat
+
+jj = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
+kk = grep("WT_Pan.neurons_untreated_", colnames(cpm.piRNA.bc))
+par(mfcol=c(1, 2))
+plot(cpm.piRNA.bc[,jj], log='xy', cex=0.7); abline(0, 1, col='red', lwd=2.0)
+plot(cpm.piRNA.bc[,kk], log='xy', cex=0.7); abline(0, 1, col='red', lwd=2.0)
+
 source("miRNAseq_functions.R")
 cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
 
@@ -226,6 +234,7 @@ save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, design.matrix,
 ######################################
 ######################################
 load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
+
 jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
 total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
 xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
