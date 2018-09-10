@@ -194,6 +194,27 @@ cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, meth
 cpm.piRNA.bc.limma = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'limma')
 cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'combat')
 
+## double check the batch correction
+pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_",  version.analysis, ".pdf")
+pdf(pdfname, width=12, height = 12)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+
+cpm.piRNA.bc = cpm.piRNA.bc.combat
+jj = grep("WT_Pan.neurons_untreated_", colnames(cpm.piRNA.bc))
+kk = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
+jj1 = grep("N2_whole.body_untreated", colnames(cpm.piRNA.bc))
+kk1 = grep("N2_whole.body_treated", colnames(cpm.piRNA.bc))
+par(mfrow=c(2, 2))
+plot(cpm.piRNA.bc[,jj], log='xy', cex=1.0); abline(0, 1, col='red', lwd=2.0)
+plot(cpm.piRNA.bc[,kk], log='xy', cex=1.0); abline(0, 1, col='red', lwd=2.0)
+
+plot(cpm.piRNA.bc[, jj1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
+plot(cpm.piRNA.bc[, kk1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
+
+
+dev.off()
+
+
 pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval_",  version.analysis, ".pdf")
 pdf(pdfname, width=16, height = 10)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -212,14 +233,6 @@ dev.off()
 ## Here we decided to use the piRNA normalization and correct the batch using ComBat 
 ####################
 ## average the biological replicates
-cpm.piRNA.bc = cpm.piRNA.bc.combat
-
-jj = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
-kk = grep("WT_Pan.neurons_untreated_", colnames(cpm.piRNA.bc))
-par(mfcol=c(1, 2))
-plot(cpm.piRNA.bc[,jj], log='xy', cex=0.7); abline(0, 1, col='red', lwd=2.0)
-plot(cpm.piRNA.bc[,kk], log='xy', cex=0.7); abline(0, 1, col='red', lwd=2.0)
-
 source("miRNAseq_functions.R")
 cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
 

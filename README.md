@@ -9,6 +9,8 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - But it is clear that in the WT background, since the oxidation is shared by more species, e.g. siRNAs, piRNAs; consequently, the oxidation efficiency is lower for miRNAs. So the log2FC in WT is always lower than the log2FC in the henn1.mutant. But there are are some particular guys, which can be highly methylated (probably) already in the background. The reason could be the Chiara's assumption.
     
   - [ ] Double check the batch correction works
+    - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
+    - The reason requires further understanding of batch correction methods.
   
   - [ ] Integrate the sample qualities into the linear model
   
@@ -19,7 +21,6 @@ This reprosition is for the deconvolution analysis for Chiara's project
 
 - the binary fraction (or proportion) matrix works better than the actual cell number matrix in which the big groups are 
   hardly penelized (not clear about the reason)
-
 
 ### time series analsyis
 `miRNA_time_series_spikeIns.R`

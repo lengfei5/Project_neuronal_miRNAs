@@ -680,7 +680,7 @@ remove.batch.using.N2.untreated = function(cpm, design.matrix, method = "linear.
     #conds = data.frame(rep(c("untreated", "treated"), ncol(cpm)/2))
     #colnames(conds) = 'treatment'
     #mod = model.matrix(~ as.factor(treatment), conds)
-    logcpm.bc = ComBat(dat=logcpm, batch=batch, mod=mod, par.prior=TRUE, ref.batch=1)
+    logcpm.bc = ComBat(dat=logcpm, batch=batch, mod=mod, par.prior=TRUE, ref.batch = NULL)
   }
   
   return(2^logcpm.bc)
