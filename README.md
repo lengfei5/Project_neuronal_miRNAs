@@ -21,6 +21,8 @@ This reprosition is for the deconvolution analysis for Chiara's project
 
 - the binary fraction (or proportion) matrix works better than the actual cell number matrix in which the big groups are 
   hardly penelized (not clear about the reason)
+- We stil have the trouble for pan-neuron sample, one of the replicates have too high gene expression in lsy-6 at least, and also higher in general.
+  For the moment, we try to remove this sample to test 
 
 ### time series analsyis
 `miRNA_time_series_spikeIns.R`
