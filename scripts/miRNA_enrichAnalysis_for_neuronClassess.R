@@ -378,6 +378,7 @@ if(Plot.for.presentation){
 
 Compare.rab3_wt_vs_henn1.mutant = FALSE
 if(Compare.rab3_wt_vs_henn1.mutant){
+  
   xx = read.csv(paste0(specDir, "miRNA_Enrichment_Analysis_Pan.neurons_henn1.mutant_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv"), header = TRUE)
   yy = read.csv(paste0(specDir, "miRNA_Enrichment_Analysis_Pan.neurons_WT_rab-3_Mature_miRNAs_neurons_v1_2018_03_07.csv"), header = TRUE)
   
@@ -390,10 +391,9 @@ if(Compare.rab3_wt_vs_henn1.mutant){
   
 }
   
-
-####################
-## log session info
-####################
+###############################
+# log session info
+###############################
 sessionDir = paste0(resDir, "/log/")
 if(!dir.exists(sessionDir)){dir.create(sessionDir)}
 
