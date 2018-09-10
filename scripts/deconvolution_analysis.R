@@ -20,7 +20,8 @@ resDir = "../results/decomvolution_results"
 if(!dir.exists(resDir)) dir.create(resDir)
 
 Data.complete = TRUE
-fitting.space = "linear" ## linear or log2 transformed for expression matrix
+fitting.space = "log2" ## linear or log2 transformed for expression matrix
+
 Use.mergedFractionMatrix = TRUE 
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
 Manually.unifiy.sample.names.forMatrix = TRUE
@@ -75,14 +76,9 @@ if(!Use.mergedExpressionMatrix){
   # this transformation is to scale the range for each gene so that all data fall into the same range and e' should still follow the positive constrain 
   # meanwhile using ratio between expression and background to filter non-expressed ones  
   ####################
-  if(fitting.space == "linear")
-  {
-    expression = xx[, -c(1)] # ignore the gene expression in the whole body
-  }else{
-    expression = xx[, -c(1, 2)]
-    expression = log2(expression/xx$background)
-  }
-    
+  expression = xx[, -c(1)] # ignore the gene expression in the whole body
+  
+  
 }else{
   source('miRNAseq_functions.R')
   newExprM = expressionMatrix.grouping(xx) 
@@ -148,6 +144,22 @@ if(Data.complete){
   
 }
 
+if(fitting.space == "log2")
+{
+  xx = proportions.sel;
+  yy = as.matrix(expression.sel);
+  
+  xx = xx[, -1]
+  xx = xx[ -1,]
+  
+  for(n in 1:nrow(yy)) yy[n, ] = log2(as.numeric(yy[n, ])/as.numeric(expression.sel[1,]))
+    
+  yy = yy[-1, ]
+  
+  proportions.sel = xx;
+  expression.sel = yy;
+}
+
 ####################
 ## double check the proprotion matrix and expression matrix
 ## match the sample order in the proprotion matrix and expression matrix 
@@ -171,7 +183,7 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
   # par(mfcol=c(1, 1))
   
   if(fitting.space == 'linear') {
-    logaxis = 'xy'; 
+    logaxis = 'xy';
     yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
     
   }else{logaxis = ''}
@@ -188,8 +200,8 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
            color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
   
   ## double check the expression matrix
-
-  par(mfrow= c(1:2))
+  
+  par(mfrow = c(1:2))
   plot(t(expression.sel[match(c("Dopaminergic", "Ciliatedsensory"), rownames(expression.sel)), ]), log=logaxis)
   abline(0, 1, lwd=2.0, col='red')
   plot(t(expression.sel[match(c("Mechanosensory",  "unc.86"), rownames(expression.sel)), ]), log=logaxis)
@@ -221,7 +233,7 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
-alpha = 0.6 # 0.001 is the default value
+alpha = 0.4 # 0.001 is the default value
 
 intercept=FALSE
 standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
@@ -230,7 +242,7 @@ grouped = FALSE
 
 for(n in 1:ncol(y))
 {
-  # n = 2
+  # n = 1
   cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
                    standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
   fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
@@ -241,8 +253,8 @@ for(n in 1:ncol(y))
   #plot(fit, label = TRUE)
   #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
   
-  #myCoefs <- coef(fit, s=cv.fit$lambda.min);
-  myCoefs = coef(cv.fit, s="lambda.min")
+  myCoefs <- coef(fit, s=cv.fit$lambda.min);
+  #myCoefs = coef(cv.fit, s="lambda.1se")
   res[,n] = as.numeric(myCoefs)[-1]
   
   cat("---------------\n", colnames(res)[n], ":\n", 
@@ -260,9 +272,18 @@ pdf(pdfname, width=15, height = 6)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
 
-pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-         cluster_cols=FALSE, main = paste0("alpha = ", alpha),
-         color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+#cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(10)
+
+if(fitting.space == "linear"){
+  pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=FALSE, main = paste0("alpha = ", alpha),
+           color = cols)
+}else{
+  pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=FALSE, main = paste0("alpha = ", alpha),
+           color = cols)
+}
 
 dev.off()
 

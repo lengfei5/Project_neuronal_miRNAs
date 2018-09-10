@@ -620,16 +620,18 @@ remove.batch.using.N2.untreated = function(cpm, design.matrix, method = "linear.
     pheno = data.frame(design.matrix, stringsAsFactors = FALSE)
     
     jj.N2.untreated = which(pheno$genotype=="N2" & pheno$treatment == "untreated" & pheno$batch == 1)
+    y = apply(logcpm[, jj.N2.untreated], 1, mean)
     batchs = unique(pheno$batch)
     batchs = batchs[which(batchs != 1)]
     for(n in 1:length(batchs))
     {
+      n = 16;
       jj.untreated = which(pheno$batch == batchs[n] & pheno$treatment == "untreated")
       if(length(jj.untreated)>0)
       {
         if(length(jj.untreated) == 1) x = logcpm[, jj.untreated]
         if(length(jj.untreated)>1) x = apply(logcpm[, jj.untreated], 1, mean)
-        y = apply(logcpm[, jj.N2.untreated], 1, mean)
+       
         fit = lm(y ~ x)
         #plot(x, y);
         #abline(fit, col='red', lwd=2.0)
