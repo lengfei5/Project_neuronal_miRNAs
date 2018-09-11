@@ -199,7 +199,7 @@ pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_",  version.analysis, ".
 pdf(pdfname, width=12, height = 12)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
-cpm.piRNA.bc = cpm.piRNA.bc.combat
+cpm.piRNA.bc = cpm.piRNA.bc.my
 jj = grep("WT_Pan.neurons_untreated_", colnames(cpm.piRNA.bc))
 kk = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
 jj1 = grep("N2_whole.body_untreated", colnames(cpm.piRNA.bc))
@@ -234,7 +234,15 @@ dev.off()
 ####################
 ## average the biological replicates
 source("miRNAseq_functions.R")
-cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+Remove.pan.neurons.samples.71822.71823 = TRUE
+if(Remove.pan.neurons.samples.71822.71823)
+{
+  kk = match(c(71822:71823), design.matrix$SampleID)
+  cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, -kk])
+}else{
+  cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+}
+
 
 save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, design.matrix, 
      file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))

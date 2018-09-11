@@ -8,6 +8,9 @@
 ## Date of creation: Fri May 25 08:00:23 2018
 ##########################################################################
 ##########################################################################
+library("pheatmap")
+library("RColorBrewer")
+source('miRNAseq_functions.R')
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 
 version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
@@ -16,11 +19,13 @@ version.EnrichscoreMatrix = "20180506"
 
 version.analysis = "_20180904"
 
-resDir = "../results/decomvolution_results"
+resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
+testDir = paste0(resDir, "/deconv_test_09_10/")
+if(!dir.exists(testDir)) dir.create(testDir)
 
 Data.complete = TRUE
-fitting.space = "log2" ## linear or log2 transformed for expression matrix
+fitting.space = "linear" ## linear or log2 transformed for expression matrix
 
 Use.mergedFractionMatrix = TRUE 
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
@@ -223,7 +228,7 @@ y = as.matrix(expression.sel)
 
 x = x >0 
 
-Example2test = c("lsy-6", "mir-791", "mir-793", "mir-790", "mir-1821", "mir-83", "mir-124")
+Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
 jj2test = match(Example2test, colnames(y))
 y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
 
@@ -233,12 +238,19 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
-alpha = 0.4 # 0.001 is the default value
+alpha = 0.8 # 0.001 is the default value
 
 intercept=FALSE
 standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
 standardize.response=FALSE
 grouped = FALSE
+
+pdfname = paste0(testDir, "deconv_test", version.analysis, 
+                 "_fitting.", fitting.space, "_alpha.", alpha, ".pdf")
+pdf(pdfname, width=15, height = 6)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+par(mfrow=c(1, 1))
+
 
 for(n in 1:ncol(y))
 {
@@ -249,7 +261,7 @@ for(n in 1:ncol(y))
              standardize=standardize, standardize.response=standardize.response, intercept=intercept)
   
   #par(mfrow= c(1,1))
-  #plot(cv.fit)
+  plot(cv.fit, main = colnames(y)[n])
   #plot(fit, label = TRUE)
   #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
   
@@ -266,20 +278,13 @@ for(n in 1:ncol(y))
   #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
 }
 
-pdfname = paste0(resDir, "/deconv_test/res_deconv", version.analysis, 
-                 "_fitting.", fitting.space, "_alpha.", alpha, ".pdf")
-pdf(pdfname, width=15, height = 6)
-par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-par(mfrow=c(1, 1))
-
-#cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(10)
-
 if(fitting.space == "linear"){
+  cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
   pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
            cluster_cols=FALSE, main = paste0("alpha = ", alpha),
            color = cols)
 }else{
+  cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(10)
   pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
            cluster_cols=FALSE, main = paste0("alpha = ", alpha),
            color = cols)
