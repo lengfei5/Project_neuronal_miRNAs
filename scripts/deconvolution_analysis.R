@@ -21,11 +21,11 @@ version.analysis = "_20180904"
 
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
-testDir = paste0(resDir, "/deconv_test_09_10/")
+testDir = paste0(resDir, "/deconv_test_09_12/")
 if(!dir.exists(testDir)) dir.create(testDir)
 
 Data.complete = TRUE
-fitting.space = "linear" ## linear or log2 transformed for expression matrix
+fitting.space = "log2" ## linear or log2 transformed for expression matrix
 
 Use.mergedFractionMatrix = TRUE 
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern

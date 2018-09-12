@@ -10,6 +10,7 @@
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 statDir = "../data/normalized_piRNAs"
 version.table = "miRNAs_neurons_v1_2018_03_07"
+
 resDir = "../results/tables_for_decomvolution"
 if(!dir.exists(resDir)) dir.create(resDir)
 Save.Processed.Tables = TRUE
@@ -186,6 +187,14 @@ save(stats, countData, design.matrix, cpm.piRNA, file = paste0(RdataDir, 'piRAN_
 ######################################
 load(file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.table, '.Rdata'))
 
+Use.ComBat.for.batch.correction = TRUE
+## to test if one rab-3 replicates should be removed
+Remove.pan.neurons.samples.71822.71823 = FALSE
+
+
+###############################
+# choose the method of batch correction 
+###############################
 source("miRNAseq_functions.R")
 design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(15,2), rep(16, 2), rep(17, 4))
 #method.sel = 'linear.model'
@@ -194,12 +203,18 @@ cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, meth
 cpm.piRNA.bc.limma = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'limma')
 cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'combat')
 
+if(Use.ComBat.for.batch.correction){
+  cpm.piRNA.bc = cpm.piRNA.bc.combat
+}else{
+  cpm.piRNA.bc = cpm.piRNA.bc.my
+}
+
+
 ## double check the batch correction
 pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_",  version.analysis, ".pdf")
 pdf(pdfname, width=12, height = 12)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
-cpm.piRNA.bc = cpm.piRNA.bc.my
 jj = grep("WT_Pan.neurons_untreated_", colnames(cpm.piRNA.bc))
 kk = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
 jj1 = grep("N2_whole.body_untreated", colnames(cpm.piRNA.bc))
@@ -211,12 +226,11 @@ plot(cpm.piRNA.bc[,kk], log='xy', cex=1.0); abline(0, 1, col='red', lwd=2.0)
 plot(cpm.piRNA.bc[, jj1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
 plot(cpm.piRNA.bc[, kk1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
 
-
 dev.off()
 
 
 pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval_",  version.analysis, ".pdf")
-pdf(pdfname, width=16, height = 8)
+pdf(pdfname, width=20, height = 8)
 par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 #par(mfrow=c(1, 1))
 # par(mfcol=c(1, 1))
@@ -234,15 +248,23 @@ dev.off()
 ####################
 ## average the biological replicates
 source("miRNAseq_functions.R")
-Remove.pan.neurons.samples.71822.71823 = FALSE
+
 if(Remove.pan.neurons.samples.71822.71823)
 {
   kk = match(c(71822:71823), design.matrix$SampleID)
   cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, -kk])
 }else{
   cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+  cpm.piRNA.bc.meanrep.log2 = average.biological.replicates(log2(cpm.piRNA.bc))
 }
 
+mm = match(c("lsy-6", "mir-791", "mir-790"), rownames(cpm.piRNA.bc))
+
+cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))]
+log2(cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))])
+
+log2(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))]) - log2(cpm.piRNA.bc.meanrep[mm, 2])
+(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))]) - cpm.piRNA.bc.meanrep.log2[mm, 2]
 
 save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, design.matrix, 
      file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
