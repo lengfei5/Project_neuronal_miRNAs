@@ -730,22 +730,12 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
     ratios[,n] = tcs[,n]/total[,n] 
   }
   
-  par(mfrow=c(2, 2))
+  ###############################
+  # check ratios between treated and untreated samples and other two samples
+  ###############################
+  par(mfrow=c(1, 3))
   hist(log10(ratios), xlab = "log10(treated/untreated)", main = paste0(main.names), breaks = 100)
   abline(v=c(-3:0), col='darkred', lwd=2.0)
-  
-  ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
-  kk = which(rownames(cpm)=='lsy-6')
-  lims = range(c(total[kk, ], tcs[kk,]))
-  plot(c(1:length(ns)), tcs[kk, ], type= 'b', col='darkblue', cex=2.0, log='y', ylim =lims, main = paste0("lsy-6 in ", main.names), xlab=NA, 
-       ylab = 'normalizaed by piRNAs (in log)', axe = FALSE)
-  points(c(1:length(ns)), total[kk, ], type= 'b', col='black', cex=2.0)
-  legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
-  axis(2, las= 1)
-  ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
-  ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
-  axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
-  box()
   
   plot(tcs[,which(colnames(tcs) == "Dopaminergic.neurons")], tcs[,which(colnames(tcs) == "Ciliated.sensory.neurons")], log='xy', 
        xlab='Dopaminergic (in log)', ylab='Ciliated (in log)', main = main.names)
@@ -754,6 +744,49 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
   plot(tcs[,which(colnames(tcs) == "mechanosensory.neurons" )], tcs[,which(colnames(tcs) == "unc-86.expressing.neurons")], log='xy', 
        xlab='mechanosensory (in log)', ylab='unc-86 (in log)', main = main.names)
   abline(0, 1, lwd=2.0, col='red')
+  
+  ###############################
+  # check three examples lsy-6, mir-791 and mir-790 across all samples
+  # different replicates should be also displayed
+  ###############################
+  for(gg in c("lsy-6", "mir-791", "mir-790"))
+  {
+    #gg = "lsy-6"
+    par(mfrow=c(1, 3))
+    par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
+    kk = which(rownames(cpm)==gg)
+    
+    
+    for(m in c(1:3)){
+      if(m == 1) {log = 'y'; lims = range(cpm[kk,]);}
+      if(m == 2) {log = ''; lims = range(cpm[kk,]);}
+      if(m == 3) {log = ''; lims = range(cpm[kk, which(design.matrix$treatment=="treated")]);}
+      plot(c(1:length(ns)), tcs[kk, ], type= 'l', col='darkblue', cex=1.0, log=log, ylim =lims, main = paste0(gg ," in ", main.names), xlab=NA, 
+           ylab = 'normalizaed by piRNAs', axe = FALSE)
+      #points(c(1:length(ns)), tcs[kk, ], type = "b", cex=1.0, col = 'darkblue')
+      points(c(1:length(ns)), total[kk, ], type= 'l', col='black', cex=1.0)
+      #points(c(1:length(ns)), total[kk, ], type= 'b', col= "black", cex= 1.0)
+      
+      for(n in 1:length(ns))
+      {
+        index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")
+        points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='darkblue', cex=1.5, pch =16)
+        index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
+        points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1.5, pch = 0)
+      }
+      
+      #legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
+      axis(2, las= 1)
+      ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
+      ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
+      axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
+      box()
+      
+    }
+    
+    
+  }
   
 }
 

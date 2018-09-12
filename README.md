@@ -11,6 +11,7 @@ This reprosition is for the deconvolution analysis for Chiara's project
   - [ ] Double check the batch correction works
     - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
     - The reason requires further understanding of batch correction methods.
+    - double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
   
   - [ ] Integrate the sample qualities into the linear model
   

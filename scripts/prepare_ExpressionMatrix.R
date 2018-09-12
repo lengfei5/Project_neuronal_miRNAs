@@ -13,7 +13,7 @@ version.table = "miRNAs_neurons_v1_2018_03_07"
 resDir = "../results/tables_for_decomvolution"
 if(!dir.exists(resDir)) dir.create(resDir)
 Save.Processed.Tables = TRUE
-version.analysis = "neuronal_miRNAs_20180831"
+version.analysis = "neuronal_miRNAs_20180911"
 
 ######################################
 ######################################
@@ -216,8 +216,8 @@ dev.off()
 
 
 pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval_",  version.analysis, ".pdf")
-pdf(pdfname, width=16, height = 10)
-par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+pdf(pdfname, width=16, height = 8)
+par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 #par(mfrow=c(1, 1))
 # par(mfcol=c(1, 1))
 source("miRNAseq_functions.R")
@@ -234,7 +234,7 @@ dev.off()
 ####################
 ## average the biological replicates
 source("miRNAseq_functions.R")
-Remove.pan.neurons.samples.71822.71823 = TRUE
+Remove.pan.neurons.samples.71822.71823 = FALSE
 if(Remove.pan.neurons.samples.71822.71823)
 {
   kk = match(c(71822:71823), design.matrix$SampleID)
