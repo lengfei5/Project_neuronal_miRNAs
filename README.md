@@ -7,12 +7,13 @@ This reprosition is for the deconvolution analysis for Chiara's project
     will be to compare the henn1-mutant without promoter, henn1-mutant with ubiquitous promoter and N2 without promoter (with ubiquitous promoter data ?? not sure exits)
     - the conclusion is not very clear; because the highly enriched guys are not very highly expressed in the untreated samples, suggesting they are not simply due to the unefficient removal for unmethylated ones in the oxidation step
     - But it is clear that in the WT background, since the oxidation is shared by more species, e.g. siRNAs, piRNAs; consequently, the oxidation efficiency is lower for miRNAs. So the log2FC in WT is always lower than the log2FC in the henn1.mutant. But there are are some particular guys, which can be highly methylated (probably) already in the background. The reason could be the Chiara's assumption.
-    - By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable.
     
   - [ ] Double check the batch correction works
     - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
     - The reason requires further understanding of batch correction methods.
     - double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
+    - By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable.
+    
   
   - [ ] Integrate the sample qualities into the linear model
   
