@@ -14,6 +14,8 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
     - By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
     
+  - [ ] test gene-specifc parameter alpha, find the method to select the optimal alpha for each gene
+    - use the cv to select alpha, specifically, prefix a vector of alpha, and then run cv.glment and find the minimum of MSE; finally, the alpha yielding the lowest MSE will be selected      
   
   - [ ] Integrate the sample qualities into the linear model
   

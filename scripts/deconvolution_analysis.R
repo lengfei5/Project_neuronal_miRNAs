@@ -21,12 +21,13 @@ version.analysis = "_20180904"
 
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
-testDir = paste0(resDir, "/deconv_test_09_12/")
+testDir = paste0(resDir, "/deconv_test_09_12_tuning_alpha/")
 if(!dir.exists(testDir)) dir.create(testDir)
 
 Data.complete = TRUE
 fitting.space = "log2" ## linear or log2 transformed for expression matrix
 
+add.background.sample.in.fitting.linear.space = TRUE
 Use.mergedFractionMatrix = TRUE 
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
 Manually.unifiy.sample.names.forMatrix = TRUE
@@ -103,26 +104,40 @@ if(!Use.mergedExpressionMatrix){
 if(Manually.unifiy.sample.names.forMatrix){
   rownames(proportions) = c("Dopaminergic","Serotonergic","Glutamatergic", "Cholinergic", "GABAergic",  "Ciliatedsensory",
                             "Mechanosensory", "unc.86", "Pharyngeal", "ceh.14", "unc.42", "unc.3","ASE", "Pan.neurons")
+  expression = t(expression)
+  rownames(expression) = c( "background", "ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
+                            "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42", 
+                            "Pan.neurons", "unc.3")
+  
+  ###############################
+  # if fitting in linear scale, then the background sample is used and the background is added in proportion matrix as well
+  # if fitting in log2 scale, then the log2(sample/background) is used; in this case, the coefficients must be also positive
+  ###############################
   if(fitting.space == "linear"){
-    expression = t(expression)
-    rownames(expression) = c( "background", "ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
-                              "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42", 
-                              "Pan.neurons", "unc.3")
-    yy = proportions;
-    yy = rbind(rep(0, ncol(proportions)), proportions)
-    yy = cbind(rep(1, nrow(yy)), yy)
-    colnames(yy) = c("C0", colnames(proportions))
-    rownames(yy) = c("background", rownames(proportions))
-    proportions = yy
-    
-    save(expression, proportions, file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
-                                                version.Fraction.Matrix,"_", version.ExprsMatrix, ".Rdata"))
-    
+    if(add.background.sample.in.fitting.linear.space){
+      yy = proportions;
+      yy = rbind(rep(0, ncol(proportions)), proportions)
+      yy = cbind(rep(1, nrow(yy)), yy)
+      colnames(yy) = c("C0", colnames(proportions))
+      rownames(yy) = c("background", rownames(proportions))
+      proportions = yy
+    }
   }else{
-    rownames(expression.sel) = c("ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
-                                  "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42")
+    
+    yy = expression;
+    for(n in 1:nrow(yy)) yy[n, ] = log2(as.numeric(yy[n, ])/as.numeric(expression[1,]))
+    
+    yy = yy[-1, ]
+    
+    ## force value to be zero if they are lower than the background
+    yy[yy<0] = 0
+    expression = yy;
     
   }
+  
+  save(expression, proportions, file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
+                                              version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
+                                              fitting.space,".Rdata"))
   #index.sel = c(13, 2, 1, 3, 6, 5, 7, 8, 9, 4, 10, 11)
   #proportions.sel = proportions[index.sel, ]
 }
@@ -130,7 +145,10 @@ if(Manually.unifiy.sample.names.forMatrix){
 ###############################
 # select genes of intereset and match sample orders
 ###############################
-load( file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", version.Fraction.Matrix,"_", version.ExprsMatrix, ".Rdata"))
+load(file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
+                     version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
+                     fitting.space,".Rdata"))
+
 load(file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.EnrichscoreMatrix, ".Rdata"))
 enriched.list = colnames(enrich.matrix.sel)
 #enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
@@ -146,23 +164,6 @@ if(Data.complete){
   jj = match(rownames(proportions), rownames(proportions.sel))
   proportions.sel = proportions.sel[jj, ]
   expression.sel = expression.sel[jj, ]
-  
-}
-
-if(fitting.space == "log2")
-{
-  xx = proportions.sel;
-  yy = as.matrix(expression.sel);
-  
-  xx = xx[, -1]
-  xx = xx[ -1,]
-  
-  for(n in 1:nrow(yy)) yy[n, ] = log2(as.numeric(yy[n, ])/as.numeric(expression.sel[1,]))
-    
-  yy = yy[-1, ]
-  
-  proportions.sel = xx;
-  expression.sel = yy;
 }
 
 ####################
@@ -223,6 +224,8 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
 ######################################
 ######################################
 require(glmnet)
+Gene.Specific.Alpha = TRUE
+
 x=as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
 
@@ -238,148 +241,126 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
-alpha = 0.8 # 0.001 is the default value
 
 intercept=FALSE
 standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
 standardize.response=FALSE
 grouped = FALSE
 
-pdfname = paste0(testDir, "deconv_test", version.analysis, 
-                 "_fitting.", fitting.space, "_alpha.", alpha, ".pdf")
-pdf(pdfname, width=15, height = 6)
-par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-par(mfrow=c(1, 1))
-
-
-for(n in 1:ncol(y))
-{
-  # n = 1
-  cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
-                   standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
-  fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
-             standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+if(Gene.Specific.Alpha){
+  library("msaenet")
+  library(doParallel)
   
-  #par(mfrow= c(1,1))
-  plot(cv.fit, main = colnames(y)[n])
-  #plot(fit, label = TRUE)
-  #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+  tune.method = "cv";
+  tune.method.nstep = "bic"
+  extract.res.from.msa = TRUE;
   
-  myCoefs <- coef(fit, s=cv.fit$lambda.min);
-  #myCoefs = coef(cv.fit, s="lambda.1se")
-  res[,n] = as.numeric(myCoefs)[-1]
+  alpha.sels = c()
+  pdfname = paste0(testDir, "deconv_test", version.analysis, 
+                   "_fitting.", fitting.space, "_alpha_tuning_with_", tune.method, "_steptune_", tune.method.nstep, ".pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(mfrow=c(1, 1))
   
-  cat("---------------\n", colnames(res)[n], ":\n", 
-      paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-      "---------------\n")
+  for(n in 1:ncol(y) ){
     
-  #coef(cv.fit, s = "lambda.min")
-  #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
-  #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
-}
-
-if(fitting.space == "linear"){
+    cat("n -- ", n, "--", colnames(y)[n],  " -- ")
+    
+    registerDoParallel(detectCores())
+    msa.fit = msaenet(x, y[,n], alphas = seq(0.05, 1.0, 0.05), family='gaussian', 
+                      lower.limits = 0, rule = "lambda.min", 
+                      tune = tune.method, tune.nsteps = tune.method.nstep,
+                      nfolds = 5L, nsteps = 10L,  seed= 1005, parallel = TRUE)
+    #plot(msa.fit)
+    alpha =  msa.fit$best.alphas[msa.fit$best.step]
+    cat("alpha = ", alpha, "\n");
+    alpha.sels = c(alpha.sels, alpha)
+    
+    if(extract.res.from.msa){
+      myCoefs = as.numeric(msa.fit$beta)
+      res[,n] = as.numeric(myCoefs)
+    }else{
+      #alpha = 0.30
+      #cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
+      #                 standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+      
+      #fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
+      #           standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+      
+      #par(mfrow= c(1,1))
+      #plot(cv.fit, main = colnames(y)[n])
+      #plot(fit, label = TRUE)
+      #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+      
+      #myCoefs <- coef(fit, s=cv.fit$lambda.min);
+      #myCoefs = coef(cv.fit, s="lambda.min")
+      res[,n] = as.numeric(myCoefs)[-1]
+    }
+    
+   
+  }
+  library("pheatmap")
+  library("RColorBrewer")
   cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-  pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=FALSE, main = paste0("alpha = ", alpha),
+  pheatmap(log2(res + 2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=FALSE, main = paste0("gene-specific alphas "),
            color = cols)
+  dev.off()
+  
+
 }else{
-  cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(10)
-  pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=FALSE, main = paste0("alpha = ", alpha),
-           color = cols)
-}
-
-dev.off()
-
-
-######################################
-######################################
-## Section: Test known packages for deconvolution
-######################################
-######################################
-Test.some.known.packages.deconvolution.methods = FALSE
-if(Test.some.known.packages.deconvolution.methods){
-
-  ## "dtangle" is R package to deconvolving cell type proportions from DNA microarray data. 
-  ## https://github.com/gjhunt/dtangle/blob/master/vign/basic-deconvolution.md
-  library('dtangle')
-  names(shen_orr_ex)
-  #library('dtangle.data')
-  #names(shen_orr_ex)
-  truth = shen_orr_ex$annotation$mixture
-  pure_samples <- lapply(1:3, function(i) {
-    which(truth[, i] == 1)
-  })
-  names(pure_samples) = colnames(truth)
-  pure_samples
   
-  Y <- shen_orr_ex$data$log
-  Y[1:4,1:4]
-  
-  marker_list = find_markers(Y,pure_samples,data_type="microarray-gene",marker_method='ratio')
-  
-  lapply(marker_list$L,head)
-  
-  q = .1
-  quantiles = lapply(marker_list$V,function(x)quantile(x,1-q))
-  K = length(pure_samples)
-  n_choose = sapply(1:K,function(i){max(which(marker_list$V[[i]] > quantiles[[i]]))})
-  n_choose
-  
-  marks = marker_list$L
-  
-  dc <- dtangle(Y,pure_samples,n_choose,data_type='microarray-gene',markers=marks)
-  
-  phats <- dc$estimates
-  plot(truth,phats,xlab="Truth",ylab="Estimates",xlim=c(0,1),ylim=c(0,1))
-  abline(coef=c(0,1))
-  
-  #### test CellMix and DSA
-  require(CellMix)
-  acr <- ExpressionMix("GSE20300", verbose = 2)
-  #x <- ExpressionMix('GSE19830', verbose=TRUE)
-  #annotation(x)
-  acr
-  #res <- gedBlood(acr, verbose = TRUE)
-  s <- esApply(acr, 1L, sd, na.rm = TRUE)
-  i <- order(s, decreasing = TRUE)[1:5000]
-  rescs <- ged(acr[i, ], coef(acr), method = "csSAM", data = acr$Status, nperms = 200,
-               verbose = TRUE)
-  x <- rmix(3, 100, 20, markers = 5)
-  basismap(x, Rowv = NA)
-  p0 <- abs(coef(x) + rmatrix(coef(x), dist = rnorm, sd = 0.2))
-  # rescale into proportion (columns sum up to one)
-  p0 <- scoef(p0)
-  
-  profplot(x, p0)
-  # fit DSection MCMC model
-  ds <- ged(x, p0, "DSection", maxIter = 20, verbose = TRUE)
-  
-  # extract mixed samples
-  mix <- mixedSamples(x)
-  # load TIGER marker list
-  ml <- MarkerList('TIGER')
-  ml
-  
-  names(ml)
-  basisnames(x)
-  
-  ml <- ml[c('brain', 'liver', 'lung')]
-  summary(ml)
-  
-  mlx <- convertIDs(ml, mix, verbose=TRUE)
-  summary(mlx)
-  
-  profplot(mlx[,1:10], mix)
-  
-  mlsc <- extractMarkers(mlx, expb(mix, 2), method='SCOREM', alpha=10^-12)
-  summary(mlsc)
-  
+  for(alpha in c(seq(0.1, 1, by= 0.1), 0.05, 0.02, 0.01, 0.55))
+  {
+    cat("alpha --", alpha, "----------\n")
+    #alpha = 0.7 # 0.001 is the default value
+    
+    pdfname = paste0(testDir, "deconv_test", version.analysis, 
+                     "_fitting.", fitting.space, "_alpha_", alpha, ".pdf")
+    pdf(pdfname, width=12, height = 8)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    par(mfrow=c(1, 1))
+    
+    
+    for(n in 1:ncol(y))
+    {
+      # n = 1
+      cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
+                       standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+      fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
+                 standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+      
+      #par(mfrow= c(1,1))
+      plot(cv.fit, main = colnames(y)[n])
+      #plot(fit, label = TRUE)
+      #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+      
+      myCoefs <- coef(fit, s=cv.fit$lambda.min);
+      #myCoefs = coef(cv.fit, s="lambda.1se")
+      res[,n] = as.numeric(myCoefs)[-1]
+      
+      cat("---------------\n", colnames(res)[n], ":\n", 
+          paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
+          "---------------\n")
+      
+      #coef(cv.fit, s = "lambda.min")
+      #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
+      #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
+    }
+    
+    if(fitting.space == "linear"){
+      cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+      pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+               cluster_cols=FALSE, main = paste0("alpha = ", alpha),
+               color = cols)
+    }else{
+      cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+      pheatmap(log2(res + 2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+               cluster_cols=FALSE, main = paste0("alpha = ", alpha),
+               color = cols)
+    }
+    
+    dev.off() 
+  }
   
 }
-
-
-
-
-

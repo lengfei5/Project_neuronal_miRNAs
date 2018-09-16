@@ -135,7 +135,7 @@ stats = stats[, mm]
 colnames(stats) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
 stats = data.frame(t(stats))
 
-save(stats, countData, design.matrix, file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
+save(stats, countData, design.matrix, library.sizes, file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
 
 ########################################################
 ########################################################
@@ -151,7 +151,7 @@ if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
   load(file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
   
   pdfname = paste0(resDir, "/Compare_piRNAs_siRNAs_spikeIns_for_scalingFactorinNormalization", version.analysis,  ".pdf")
-  pdf(pdfname, width=20, height = 18)
+  pdf(pdfname, width=12, height = 10)
   par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   # common quality control normalized by DESeq2 
