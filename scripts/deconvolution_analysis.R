@@ -300,40 +300,71 @@ if(Gene.Specific.Alpha){
         res[,n] = as.numeric(myCoefs)[-1]
       }
     }else{ ## not use msaenet; but use cv or other methods to select optimal alpha for each gene
-      alphas = seq(0.1, 1.0, by = 0.1)
+      require(glmnet)
+      library(doParallel)
+      #require(doMC)
       
-      nfolds = 10;
-      foldid=sample(1:nfolds,size=length(y[,n]),replace=TRUE)
-      lambdas = NULL;
+      # n = 2;
+      #m = 1;
+      #nb.cv = 1;
+      
+      alphas = seq(0.1, 1.0, by = 0.1)
+      lambda = 10^(seq(4, -2, length.out = 500))
+      nfolds = 5;
+      #foldid=sample(1:nfolds,size=length(y[,n]),replace=TRUE)
+      #lambdas.save = NULL;
       lambdas.min = c()
+      lambdas.1se = c()
       cvms = c()
       
       for(m in 1:length(alphas))
       {
+        #registerDoMC(cores=2)
+        registerDoParallel(detectCores())
+        set.seed(1010);
+        
         alpha = alphas[m]
-        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nfolds = nfolds, foldid = foldid,
-                         nlambda=200, standardize=standardize, lower.limits = 0,
-                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+        #cvm = rep(0, length(lambda))
+        
+        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, nfolds = nfolds, 
+                         standardize=standardize, lower.limits = 0, nlambda = length(lambda),
+                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE, parallel = TRUE)
+        
+        #for(k in 1:nb.cv){
+        #  cat(length(cv.fit$cvm), "---\n")
+        #  mm = match(cv.fit$lambda, lambda)
+        #  cvm = cvm + cv.fit$cvm
+        #}
+        #cvm = cvm/nb.cv
         par(mfrow= c(1,1))
-        plot(cv.fit, main = colnames(y)[n])
+        plot(cv.fit, main = paste0(colnames(y)[n], "-- alpha : ", alpha))
         
         cvms = c(cvms, cv.fit$cvm[which(cv.fit$lambda==cv.fit$lambda.min)])
-        lambdas[[m]] = cv.fit$lambda;
+        #cvms = c(cvms, cv.fit$cvup[which(cv.fit$lambda==cv.fit$lambda.1se)])
+        #lambdas[[m]] = cv.fit$lambda;
         lambdas.min = c(lambdas.min, cv.fit$lambda.min)
+        lambdas.1se = c(lambdas.1se, cv.fit$lambda.1se)
         #plot(fit, label = TRUE)
         #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
       }
       
       index.alpha = which(cvms==min(cvms))
       
-      fit=glmnet(x,y[,n], alpha=alphas[index.alpha], lambda=lambdas[[index.alpha]],family='gaussian', lower.limits = 0,
+      fit=glmnet(x,y[,n], alpha=alphas[index.alpha], lambda=lambda, family='gaussian', lower.limits = 0,
                  standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-      myCoefs <- coef(fit, s=lambdas.min[index.alpha]);
-     
+      #myCoefs <- coef(fit, s=lambdas.min[index.alpha]);
+      myCoefs <- coef(fit, s=lambdas.1se[index.alpha]);
+      
+      res[,n] = as.numeric(myCoefs)[-1]
+      
+      cat("---------------\n", colnames(res)[n], ":\n", 
+          paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
+          "---------------\n")
        
     }
    
   }
+  
   library("pheatmap")
   library("RColorBrewer")
   cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
