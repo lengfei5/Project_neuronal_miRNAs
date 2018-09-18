@@ -21,7 +21,7 @@ version.analysis = "_20180904"
 
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
-testDir = paste0(resDir, "/deconv_test_09_12_tuning_alpha/")
+testDir = paste0(resDir, "/deconv_test_09_18_tuning_global_lambda2/")
 if(!dir.exists(testDir)) dir.create(testDir)
 
 Data.complete = TRUE
@@ -411,6 +411,65 @@ if(Gene.Specific.Alpha){
     }
     
     dev.off() 
+  }
+  
+  
+  TEST.gcdnet = FALSE
+  if(TEST.gcdnet){
+    
+    require(gcdnet)
+    #lambda2s = 10^(seq(-3, 1, length.out = 10))
+    lambda2s = c(0.01, seq(0.05, 0.09, by = 0.01),  seq(0.1, 0.5, by=0.05), c(0.6, 0.7, 0.8, 0.9))
+    #testDir = 
+    for(lambda2 in lambda2s)
+    {
+      #lambda2 = 0.1
+      cat("lambda2 --", lambda2, "----------\n")
+      #alpha = 0.7 # 0.001 is the default value
+      
+      pdfname = paste0(testDir, "deconv_test", version.analysis, 
+                       "_fitting.", fitting.space, "_global_lambda2_",lambda2, ".pdf")
+      pdf(pdfname, width=12, height = 8)
+      par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+      par(mfrow=c(1, 1))
+      
+      
+      for(n in 1:ncol(y))
+      {
+        # n = 1; lambda2 = lambda2s[1];
+        cv.fit=cv.gcdnet(x, y[,n], nlambda=200, method = "ls", lambda2 = lambda2, nfolds = 10, standardize = FALSE)
+        #plot(cv.fit)
+        fit=gcdnet(x, y[,n], lambda=cv.fit$lambda, method = "ls", lambda2 = lambda2, standardize=FALSE) 
+        
+        #par(mfrow= c(1,1))
+        plot(cv.fit, main = colnames(y)[n])
+        #plot(fit, label = TRUE)
+        #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+        
+        #myCoefs <- coef(fit, s=cv.fit$lambda.min);
+        myCoefs = coef(fit, s=cv.fit$lambda.1se)
+        coefs = as.numeric(myCoefs)[-1]
+        rr.coefs = coefs/max(coefs)
+        coefs[which(rr.coefs<0.05)] = 0
+        res[,n] = coefs;
+        
+        cat("---------------\n", colnames(res)[n], ":\n", 
+            paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
+            "---------------\n")
+        
+        #coef(cv.fit, s = "lambda.min")
+        #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
+        #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
+      }
+      
+      cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+      pheatmap(log10(res + 10^-4), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+               cluster_cols=FALSE, main = paste0("lambda2 = ", lambda2),
+               color = cols)
+      
+      dev.off() 
+    }
+    
   }
   
 }
