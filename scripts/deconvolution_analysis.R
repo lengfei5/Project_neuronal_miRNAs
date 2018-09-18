@@ -254,7 +254,7 @@ if(Gene.Specific.Alpha){
   Use.masenet = FALSE
   tune.method = "cv";
   tune.method.nstep = "bic"
-  extract.res.from.msa = TRUE;
+  #extract.res.from.msa = TRUE;
   
   alpha.sels = c()
   
@@ -278,27 +278,11 @@ if(Gene.Specific.Alpha){
       alpha =  msa.fit$best.alphas[msa.fit$best.step]
       cat("alpha = ", alpha, "\n");
       alpha.sels = c(alpha.sels, alpha)
+      myCoefs = as.numeric(msa.fit$beta)
+      res[,n] = as.numeric(myCoefs)
       
-      if(extract.res.from.msa){
-        myCoefs = as.numeric(msa.fit$beta)
-        res[,n] = as.numeric(myCoefs)
-      }else{
-        #alpha = 0.30
-        #cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
-        #                 standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+      #if(extract.res.from.msa){
         
-        #fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
-        #           standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-        
-        #par(mfrow= c(1,1))
-        #plot(cv.fit, main = colnames(y)[n])
-        #plot(fit, label = TRUE)
-        #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
-        
-        #myCoefs <- coef(fit, s=cv.fit$lambda.min);
-        #myCoefs = coef(cv.fit, s="lambda.min")
-        res[,n] = as.numeric(myCoefs)[-1]
-      }
     }else{ ## not use msaenet; but use cv or other methods to select optimal alpha for each gene
       require(glmnet)
       library(doParallel)
