@@ -418,6 +418,7 @@ if(Gene.Specific.Alpha){
   if(TEST.gcdnet){
     
     require(gcdnet)
+    source("elasticNet_model_selection.R")
     #lambda2s = 10^(seq(-3, 1, length.out = 10))
     lambda2s = c(0.01, seq(0.05, 0.09, by = 0.01),  seq(0.1, 0.5, by=0.05), c(0.6, 0.7, 0.8, 0.9))
     #testDir = 
@@ -437,21 +438,14 @@ if(Gene.Specific.Alpha){
       for(n in 1:ncol(y))
       {
         # n = 1; lambda2 = lambda2s[1];
-        cv.fit=cv.gcdnet(x, y[,n], nlambda=200, method = "ls", lambda2 = lambda2, nfolds = 10, standardize = FALSE)
+        cv.fit=cv.gcdnet(x, y[,n], nlambda=100, method = "ls", lambda2 = lambda2, nfolds = 10, standardize = FALSE)
         #plot(cv.fit)
         fit=gcdnet(x, y[,n], lambda=cv.fit$lambda, method = "ls", lambda2 = lambda2, standardize=FALSE) 
         
         #par(mfrow= c(1,1))
         plot(cv.fit, main = colnames(y)[n])
-        #plot(fit, label = TRUE)
-        #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
         
-        #myCoefs <- coef(fit, s=cv.fit$lambda.min);
-        myCoefs = coef(fit, s=cv.fit$lambda.1se)
-        coefs = as.numeric(myCoefs)[-1]
-        rr.coefs = coefs/max(coefs)
-        coefs[which(rr.coefs<0.05)] = 0
-        res[,n] = coefs;
+        res[,n] = feature.selection.and.refitting.ols(fit, x, y[,n]);
         
         cat("---------------\n", colnames(res)[n], ":\n", 
             paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
