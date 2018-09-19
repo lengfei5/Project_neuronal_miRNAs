@@ -7,13 +7,13 @@
 # Date of creation: Wed Sep 19 11:09:08 2018
 ##########################################################################
 ##########################################################################
-feature.selection.and.refitting.ols = function(fit, x, y)
+feature.selection.and.refitting.ols = function(fit, x, y, mse.overfitting.threshold = 10^-5)
 {
   # y = y[,n]
   n.data = length(y)
   #n=length(y)
   list.lambda = fit$lambda;
-  crits = c("mse", "BIC", "AIC", "AICc","EBIC", "HBIC", "HQC", "HBIC2", "HBIC3")
+  crits = c("mse", "BIC", "AIC", "AICc", "HQC","EBIC", "HBIC",  "HBIC2", "HBIC3")
   beta = matrix(0, nrow = length(list.lambda), ncol = (ncol(x)+length(crits)))
   #rownames(beta) = paste0(list.lambda);
   colnames(beta) = c(colnames(x), crits)
@@ -49,16 +49,30 @@ feature.selection.and.refitting.ols = function(fit, x, y)
     beta[n, (ncol(x)+2)] = n.data*log(mse) + nvar*log(n.data) # bic
     beta[n, (ncol(x)+3)] = n.data*log(mse) + 2*nvar # aic
     beta[n, (ncol(x)+4)] = n.data*log(mse) + 2*nvar + (2*nvar*(nvar+1))/(n.data-nvar-1) # aicc
-    beta[n, (ncol(x)+5)] = n.data*log(mse) + log(nvar)*p_full# ebic
-    beta[n, (ncol(x)+6)] = n.data*log(mse) + 2*log(nvar)*p_full# hbic
-    beta[n, (ncol(x)+7)] = n.data*log(mse) + 2*nvar*log(log(n.data))
-    
+    beta[n, (ncol(x)+5)] = n.data*log(mse) + 2*nvar*log(log(n.data))
+    gamma = 0.5; beta[n, (ncol(x)+6)] = n.data*log(mse) + nvar*(log(n.data) + 2*gamma*log(p_full)) # ebic
+    gamma = 0.5; beta[n, (ncol(x)+7)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic
+    gamma = 1; beta[n, (ncol(x)+8)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic2
+    gamma = 2; beta[n, (ncol(x)+9)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic3
   }
   
   beta = data.frame(beta)
   #plot(fit, label = TRUE)
   #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
-  
+  kk = which(beta$mse>mse.overfitting.threshold)
+  if(length(kk)>0){
+    beta.fitered = beta[kk, ]
+    
+    par(mfrow= c(2,2))
+    plot(beta.fitered$BIC)
+    #plot(beta.fitered$EBIC)
+    plot(beta.fitered$HBIC)
+    plot(beta.fitered$HBIC2)
+    plot(beta.fitered$HBIC3)
+    
+    optimal = which(beta.fitered$HBIC2 == min(beta.fitered$HBIC2))[1]
+    #optimal.HBIC3 = which(beta.fitered$HBIC3 == min(beta.fitered$HBIC3))[1]
+  }
   #myCoefs <- coef(fit, s=cv.fit$lambda.min);
   #myCoefs = coef(fit, s=cv.fit$lambda.1se)
   #coefs = as.numeric(myCoefs)[-1]
@@ -67,14 +81,17 @@ feature.selection.and.refitting.ols = function(fit, x, y)
   
   #crit=switch(crit,bic=bic,aic=aic,aicc=aicc,hqc=hqc)
   
-  selected=best.model = which(crit == min(crit))
+  #selected=best.model = which(crit == min(crit))
   
-  ic=c(bic=bic[selected],aic=aic[selected],aicc=aicc[selected],hqc=hqc[selected])
+  #ic=c(bic=bic[selected],aic=aic[selected],aicc=aicc[selected],hqc=hqc[selected])
+  result = list(coefficients = beta[optimal, c(1:ncol(x))], 
+                 optimal = optimal, 
+                 coefficients.all = beta )
   
-  result=list(coefficients=coef[,selected],ic=ic,lambda = lambda[selected], nvar=nvar[selected],
-              glmnet=model,residuals=residuals[,selected],fitted.values=yhat[,selected],ic.range=crit, call = match.call())
+  #result=list(coefficients=coef[,selected],ic=ic,lambda = lambda[selected], nvar=nvar[selected],
+  #            glmnet=model,residuals=residuals[,selected],fitted.values=yhat[,selected],ic.range=crit, call = match.call())
   
-  class(result)="ic.glmnet"
+  #class(result)="ic.glmnet"
   return(result)  
   
 }

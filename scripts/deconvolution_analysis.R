@@ -21,7 +21,7 @@ version.analysis = "_20180904"
 
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
-testDir = paste0(resDir, "/deconv_test_09_18_tuning_global_lambda2/")
+testDir = paste0(resDir, "/deconv_test_09_19_gcdnet_tuning_global_lambda2_HBIC/")
 if(!dir.exists(testDir)) dir.create(testDir)
 
 Data.complete = TRUE
@@ -371,7 +371,6 @@ if(Gene.Specific.Alpha){
     par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     par(mfrow=c(1, 1))
     
-    
     for(n in 1:ncol(y))
     {
       # n = 1
@@ -424,7 +423,7 @@ if(Gene.Specific.Alpha){
     #testDir = 
     for(lambda2 in lambda2s)
     {
-      #lambda2 = 0.1
+      # lambda2 = 0.1
       cat("lambda2 --", lambda2, "----------\n")
       #alpha = 0.7 # 0.001 is the default value
       
@@ -443,9 +442,9 @@ if(Gene.Specific.Alpha){
         fit=gcdnet(x, y[,n], lambda=cv.fit$lambda, method = "ls", lambda2 = lambda2, standardize=FALSE) 
         
         #par(mfrow= c(1,1))
-        plot(cv.fit, main = colnames(y)[n])
-        
-        res[,n] = feature.selection.and.refitting.ols(fit, x, y[,n]);
+        #plot(cv.fit, main = colnames(y)[n])
+        myCoefs = feature.selection.and.refitting.ols(fit, x, y[,n]);
+        res[,n] = as.numeric(myCoefs$coefficients)
         
         cat("---------------\n", colnames(res)[n], ":\n", 
             paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
@@ -456,12 +455,15 @@ if(Gene.Specific.Alpha){
         #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
       }
       
+      res[which(res ==0 )] = NA
+      
       cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-      pheatmap(log10(res + 10^-4), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-               cluster_cols=FALSE, main = paste0("lambda2 = ", lambda2),
+      pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+               cluster_cols=FALSE, main = paste0("lambda2 = ", lambda2), na_col = "gray30",
                color = cols)
       
       dev.off() 
+      
     }
     
   }
