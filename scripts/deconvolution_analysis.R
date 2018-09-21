@@ -17,12 +17,12 @@ version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
 
-version.analysis = "_20180904"
+version.analysis = "_20180920"
 
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
-testDir = paste0(resDir, "/deconv_test_09_19_gcdnet_tuning_global_lambda2_HBIC/")
-if(!dir.exists(testDir)) dir.create(testDir)
+#testDir = paste0(resDir, "deconv_test_09_20_gcdnet_tuning_global_lambda2_cv/")
+#if(!dir.exists(testDir)) dir.create(testDir)
 
 Data.complete = TRUE
 fitting.space = "log2" ## linear or log2 transformed for expression matrix
@@ -125,12 +125,10 @@ if(Manually.unifiy.sample.names.forMatrix){
   }else{
     
     yy = expression;
+    # log2 (expresion/background)
     for(n in 1:nrow(yy)) yy[n, ] = log2(as.numeric(yy[n, ])/as.numeric(expression[1,]))
     
     yy = yy[-1, ]
-    
-    ## force value to be zero if they are lower than the background
-    yy[yy<0] = 0
     expression = yy;
     
   }
@@ -174,7 +172,7 @@ if(Data.complete){
 if(Check.ProprotionMatrix.ExpressionMatrix){
   xx = proportions.sel;
   xx[which(xx>0)] = 1
-
+  
   yy = expression.sel;
   #yy = expression.sel[c(3, 2, 4, 10, 6, 5, 7, 8, 9, 11, 12, 1), ];
   #yy = proportions[c(index.sel, 12, 14), ]
@@ -192,11 +190,12 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
     logaxis = 'xy';
     yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
     
+    xx = xx[-1, -1];
+    yy = yy[-1,  ]
+    
   }else{logaxis = ''}
   
-  xx = xx[-1, -1];
-  yy = yy[-1,  ]
-  
+ 
   pheatmap(xx, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
            cluster_cols=TRUE, 
            color = c("lightgray", "blue"), legend = FALSE)
@@ -206,8 +205,16 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
            color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
   
   ## double check the expression matrix
+  par(mfrow = c(1, 1))
+  mm = match(c("Cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
+  plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", ylab = "sum of Cho, Glut, GABA, Dop and Ser")
+  abline(0, 1, col="red", lwd=2.0)
+  #abline(h=1, col="darkgray", lwd=2.0)
   
-  par(mfrow = c(1:2))
+  text(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
+       pos = 1, offset = 0.4)
+  
+  par(mfrow = c(1, 2))
   plot(t(expression.sel[match(c("Dopaminergic", "Ciliatedsensory"), rownames(expression.sel)), ]), log=logaxis)
   abline(0, 1, lwd=2.0, col='red')
   plot(t(expression.sel[match(c("Mechanosensory",  "unc.86"), rownames(expression.sel)), ]), log=logaxis)
@@ -224,12 +231,17 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
 ######################################
 ######################################
 require(glmnet)
-Gene.Specific.Alpha = TRUE
+require(gcdnet)
+library("pheatmap")
+library("RColorBrewer")
 
 x=as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
 
 x = x >0 
+
+## force value to be zero if they are lower than the background
+y[y<0] = 0
 
 Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
 jj2test = match(Example2test, colnames(y))
@@ -242,230 +254,105 @@ rownames(res) = colnames(x)
 #x = x[, which(x.ms>0)]
 #x = x>0
 
-intercept=FALSE
-standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
-standardize.response=FALSE
-grouped = FALSE
 
-if(Gene.Specific.Alpha){
-  library("msaenet")
-  library(doParallel)
+########################################################
+########################################################
+# Section: gcdnet with global lambda2 parameter
+########################################################
+########################################################
+TEST.gcdnet.global.lambda2 = TRUE
+if(TEST.gcdnet.global.lambda2){
   
-  Use.masenet = FALSE
-  tune.method = "cv";
-  tune.method.nstep = "bic"
-  #extract.res.from.msa = TRUE;
+  testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_gcdnet_tuning_global_lambda2")
+  if(!dir.exists(testDir)) dir.create(testDir)
   
-  alpha.sels = c()
-  
-  pdfname = paste0(testDir, "deconv_test", version.analysis, 
-                   "_fitting.", fitting.space, "_alpha_tuning_with_", tune.method, "_steptune_", tune.method.nstep, ".pdf")
-  pdf(pdfname, width=12, height = 8)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(1, 1))
-  
-  for(n in 1:ncol(y) ){
+  require(gcdnet)
+  source("select_tuningParams_elasticNet.R")
     
-    cat("n -- ", n, "--", colnames(y)[n],  " -- ")
-    
-    if(Use.masenet){
-      registerDoParallel(detectCores())
-      msa.fit = msaenet(x, y[,n], alphas = seq(0.05, 1.0, 0.05), family='gaussian', 
-                        lower.limits = 0, rule = "lambda.min", 
-                        tune = tune.method, tune.nsteps = tune.method.nstep,
-                        nfolds = 5L, nsteps = 10L,  seed= 1005, parallel = TRUE)
-      #plot(msa.fit)
-      alpha =  msa.fit$best.alphas[msa.fit$best.step]
-      cat("alpha = ", alpha, "\n");
-      alpha.sels = c(alpha.sels, alpha)
-      myCoefs = as.numeric(msa.fit$beta)
-      res[,n] = as.numeric(myCoefs)
-      
-      #if(extract.res.from.msa){
-        
-    }else{ ## not use msaenet; but use cv or other methods to select optimal alpha for each gene
-      require(glmnet)
-      library(doParallel)
-      #require(doMC)
-      
-      # n = 2;
-      #m = 1;
-      #nb.cv = 1;
-      
-      alphas = seq(0.1, 1.0, by = 0.1)
-      lambda = 10^(seq(4, -2, length.out = 500))
-      nfolds = 5;
-      #foldid=sample(1:nfolds,size=length(y[,n]),replace=TRUE)
-      #lambdas.save = NULL;
-      lambdas.min = c()
-      lambdas.1se = c()
-      cvms = c()
-      
-      for(m in 1:length(alphas))
-      {
-        #registerDoMC(cores=2)
-        registerDoParallel(detectCores())
-        set.seed(1010);
-        
-        alpha = alphas[m]
-        #cvm = rep(0, length(lambda))
-        
-        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, nfolds = nfolds, 
-                         standardize=standardize, lower.limits = 0, nlambda = length(lambda),
-                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE, parallel = TRUE)
-        
-        #for(k in 1:nb.cv){
-        #  cat(length(cv.fit$cvm), "---\n")
-        #  mm = match(cv.fit$lambda, lambda)
-        #  cvm = cvm + cv.fit$cvm
-        #}
-        #cvm = cvm/nb.cv
-        par(mfrow= c(1,1))
-        plot(cv.fit, main = paste0(colnames(y)[n], "-- alpha : ", alpha))
-        
-        cvms = c(cvms, cv.fit$cvm[which(cv.fit$lambda==cv.fit$lambda.min)])
-        #cvms = c(cvms, cv.fit$cvup[which(cv.fit$lambda==cv.fit$lambda.1se)])
-        #lambdas[[m]] = cv.fit$lambda;
-        lambdas.min = c(lambdas.min, cv.fit$lambda.min)
-        lambdas.1se = c(lambdas.1se, cv.fit$lambda.1se)
-        #plot(fit, label = TRUE)
-        #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
-      }
-      
-      index.alpha = which(cvms==min(cvms))
-      
-      fit=glmnet(x,y[,n], alpha=alphas[index.alpha], lambda=lambda, family='gaussian', lower.limits = 0,
-                 standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-      #myCoefs <- coef(fit, s=lambdas.min[index.alpha]);
-      myCoefs <- coef(fit, s=lambdas.1se[index.alpha]);
-      
-      res[,n] = as.numeric(myCoefs)[-1]
-      
-      cat("---------------\n", colnames(res)[n], ":\n", 
-          paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-          "---------------\n")
-       
-    }
-   
-  }
-  
-  library("pheatmap")
-  library("RColorBrewer")
   cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-  pheatmap(log2(res + 2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=FALSE, main = paste0("gene-specific alphas "),
-           color = cols)
-  dev.off()
   
-
-}else{
+  lambda2s = c(seq(0.01, 0.09, by=0.01), seq(0.1, 0.5, by=0.05))
+  lambda = 10^seq(-4, 2, length.out = 200)
   
-  for(alpha in c(seq(0.1, 1, by= 0.1), 0.05, 0.02, 0.01, 0.55))
+  for(method in c("cv.lambda.1se"))
   {
-    cat("alpha --", alpha, "----------\n")
-    #alpha = 0.7 # 0.001 is the default value
-    
     pdfname = paste0(testDir, "deconv_test", version.analysis, 
-                     "_fitting.", fitting.space, "_alpha_", alpha, ".pdf")
-    pdf(pdfname, width=12, height = 8)
+                     "_fitting.", fitting.space, "_global_lambda2_",lambda2, "_method4crit_", method, ".pdf")
+    
+    pdf(pdfname, width=16, height = 10)
     par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     par(mfrow=c(1, 1))
     
-    for(n in 1:ncol(y))
-    {
-      # n = 1
-      cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=200, standardize=standardize, lower.limits = 0,
-                       standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
-      fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
-                 standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-      
-      #par(mfrow= c(1,1))
-      plot(cv.fit, main = colnames(y)[n])
-      #plot(fit, label = TRUE)
-      #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
-      
-      myCoefs <- coef(fit, s=cv.fit$lambda.min);
-      #myCoefs = coef(cv.fit, s="lambda.1se")
-      res[,n] = as.numeric(myCoefs)[-1]
-      
-      cat("---------------\n", colnames(res)[n], ":\n", 
-          paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-          "---------------\n")
-      
-      #coef(cv.fit, s = "lambda.min")
-      #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
-      #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
-    }
-    
-    if(fitting.space == "linear"){
-      cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-      pheatmap(log2(res[-1, ]+2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-               cluster_cols=FALSE, main = paste0("alpha = ", alpha),
-               color = cols)
-    }else{
-      cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-      pheatmap(log2(res + 2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-               cluster_cols=FALSE, main = paste0("alpha = ", alpha),
-               color = cols)
-    }
-    
-    dev.off() 
-  }
-  
-  
-  TEST.gcdnet = FALSE
-  if(TEST.gcdnet){
-    
-    require(gcdnet)
-    source("elasticNet_model_selection.R")
-    #lambda2s = 10^(seq(-3, 1, length.out = 10))
-    lambda2s = c(0.01, seq(0.05, 0.09, by = 0.01),  seq(0.1, 0.5, by=0.05), c(0.6, 0.7, 0.8, 0.9))
-    #testDir = 
     for(lambda2 in lambda2s)
     {
-      # lambda2 = 0.1
+      # lambda2 = 0.2
       cat("lambda2 --", lambda2, "----------\n")
-      #alpha = 0.7 # 0.001 is the default value
-      
-      pdfname = paste0(testDir, "deconv_test", version.analysis, 
-                       "_fitting.", fitting.space, "_global_lambda2_",lambda2, ".pdf")
-      pdf(pdfname, width=12, height = 8)
-      par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-      par(mfrow=c(1, 1))
-      
-      
+      #alpha = 0.7 # 0.001 is the default valu
       for(n in 1:ncol(y))
       {
         # n = 1; lambda2 = lambda2s[1];
-        cv.fit=cv.gcdnet(x, y[,n], nlambda=100, method = "ls", lambda2 = lambda2, nfolds = 10, standardize = FALSE)
-        #plot(cv.fit)
-        fit=gcdnet(x, y[,n], lambda=cv.fit$lambda, method = "ls", lambda2 = lambda2, standardize=FALSE) 
+        source("select_tuningParams_elasticNet.R")
+        main = paste0(" (lambda2=", signif(lambda2, d=2), ")::", colnames(y)[n]);
+        myCoefs = select.tuning.parameters.for.gcdnet(x, y[,n], lambda = lambda, lambda2=lambda2, nfold =10, method = method, omit.BIC = TRUE);
+        res[,n] = as.numeric(myCoefs$coefficients)
         
         #par(mfrow= c(1,1))
         #plot(cv.fit, main = colnames(y)[n])
-        myCoefs = feature.selection.and.refitting.ols(fit, x, y[,n]);
-        res[,n] = as.numeric(myCoefs$coefficients)
         
-        cat("---------------\n", colnames(res)[n], ":\n", 
-            paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-            "---------------\n")
+        #cat("---", colnames(res)[n], "---\n", 
+        #    paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n")
         
         #coef(cv.fit, s = "lambda.min")
         #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
         #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
       }
-      
-      res[which(res ==0 )] = NA
-      
-      cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
       pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-               cluster_cols=FALSE, main = paste0("lambda2 = ", lambda2), na_col = "gray30",
+               cluster_cols=FALSE, main = paste0("lambda2 = ", lambda2, " - method : ", method), na_col = "gray30",
                color = cols)
       
-      dev.off() 
-      
     }
-    
+  
+    dev.off() 
   }
+   
+}
+
+########################################################
+########################################################
+# Section: glmnet with global alpha parameter or gene-specific alpha parameters
+########################################################
+########################################################
+require(glmnet)
+
+TEST.glmnet.gene.specific.alpha = TRUE
+
+Methods2test = c("cv.lambda.1se")
+
+alphas = c(0.01, 0.02, 0.05,seq(0.1, 1, by= 0.05))
+#alphas = c(0.1)
+lambda = 10^seq(-4, 2, length.out = 200)
+
+source("select_tuningParams_elasticNet.R")
+
+if(TEST.glmnet.gene.specific.alpha) {testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_gene_specific_alpha");
+}else{testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_global_alpha"); }
+if(!dir.exists(testDir)) dir.create(testDir)
+
+for(method in Methods2test)
+{
+  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
+                   "_fitting.", fitting.space, 
+                   "_glmnet_global_alpha_method_select_tuning_parameters_", method,
+                   ".pdf")
+  
+  pdf(pdfname, width=16, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(mfrow=c(1, 1))
+  
+  run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
+  
+  dev.off()
   
 }
+
+
