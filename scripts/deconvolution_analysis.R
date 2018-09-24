@@ -46,6 +46,7 @@ if(Use.mergedFractionMatrix){
 }else{
   load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", 
                      version.Fraction.Matrix, ".Rdata"))
+  #write.csv(proportions, file = "../results/tables_for_decomvolution/proportion_matrix_for_Chiara.csv")
   source('miRNAseq_functions.R')
   
   pdfname = paste0(resDir, "/heatmap_for_merging_proportionaMatrix.pdf")
@@ -241,7 +242,7 @@ y = as.matrix(expression.sel)
 x = x >0 
 
 ## force value to be zero if they are lower than the background
-#y[y<0] = 0
+y[y<0] = 0
 
 Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
 jj2test = match(Example2test, colnames(y))
