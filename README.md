@@ -19,7 +19,7 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - [x] Test gene-specifc parameter alpha, find the method to select the optimal alpha for each gene
       - test adaptive elastic-net and extract results from the `msaenet` function
       - use the cv to select alpha, specifically, prefix a vector of alpha, and then run cv.glment and find the minimum of MSE; finally, the alpha yielding the lowest MSE will be selected  
-  - [ ] After testing, one conclusion drawn is that the global alpha in glment works better than other choices, namely, global lambda2 in gcdnet and gene-specific alpha in glmnet  
+  - [x] After testing, one conclusion drawn is that the global alpha in glment works better than other choices, namely, global lambda2 in gcdnet and gene-specific alpha in glmnet  
   
   - [ ] Integrate the sample qualities into the linear model
   
