@@ -170,7 +170,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
     for(alpha in alphas)
     {
       cat("alpha --", alpha, "----------\n")
-      # alpha = 0.5
+      # alpha = 0.7; lambda = NULL;
       
       res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
       colnames(res) = colnames(y)
@@ -178,10 +178,11 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
       
       for(n in 1:ncol(y))
       {
-        # n = 1
+        # n = 2
         if(is.null(lambda)){
           cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
+          
         }else{
           cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
@@ -192,9 +193,43 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
         
         #par(mfrow= c(1,1))
         # plot(cv.fit, main = colnames(y)[n])
-        
         if(method == "cv.lambda.1se") myCoefs <- coef(fit, s=cv.fit$lambda.1se);
         if(method == "cv.lambda.min") myCoefs <- coef(fit, s=cv.fit$lambda.min);
+        if(method == "bic"){
+          n.var = fit$df;
+          n.data = length(y[,n]);
+          bic = deviance.glmnet(fit) + n.var *log(n.data)
+          crits = bic;
+          optim.crits = which(bic==min(crits))
+          myCoefs <- coef(fit, s=fit$lambda[optim.crits]);
+        }
+        if(method == "aic"){
+          n.var = fit$df;
+          n.data = length(y[,n]);
+          aic = deviance.glmnet(fit) + 2*n.var;
+          crits = aic;
+          optim.crits = which(crits==min(crits))
+          myCoefs <- coef(fit, s=fit$lambda[optim.crits]);
+        }
+        if(method == "aicc"){
+          n.var = fit$df;
+          n.data = length(y[,n]);
+          aicc = deviance.glmnet(fit) + 2*n.var + (2*nvar*(nvar+1))/(n.data-nvar-1);
+          crits = aicc;
+          optim.crits = which(crits==min(crits))
+          myCoefs <- coef(fit, s=fit$lambda[optim.crits]);
+        }
+        
+        #beta[n, (ncol(x)+1)] = mse
+        #beta[n, (ncol(x)+2)] =  cv.fit$cvm[n] # cv
+        #beta[n, (ncol(x)+3)] = n.data*log(mse) + 2*nvar # aic
+        #beta[n, (ncol(x)+4)] = n.data*log(mse) + 2*nvar + (2*nvar*(nvar+1))/(n.data-nvar-1) # aicc
+        #beta[n, (ncol(x)+5)] = n.data*log(mse) + 2*nvar*log(log(n.data)) # hqc
+        #beta[n, (ncol(x)+6)] = n.data*log(mse) + nvar*log(n.data) # bic
+        #gamma = 0.5; beta[n, (ncol(x)+7)] = n.data*log(mse) + nvar*(log(n.data) + 2*gamma*log(p_full)) # ebic
+        #gamma = 0.5; beta[n, (ncol(x)+8)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic
+        #gamma = 1; beta[n, (ncol(x)+9)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic2
+        #gamma = 2; beta[n, (ncol(x)+10)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic3
        
         res[, n] = as.numeric(myCoefs)[-1]
         
@@ -369,9 +404,4 @@ select.tuning.parameters.using.msaenet = function(x, y)
   pheatmap(log2(res + 2^-10), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
            cluster_cols=FALSE, main = paste0("gene-specific alphas "),
            color = cols)
-  
-  
 }
-
-
-

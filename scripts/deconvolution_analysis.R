@@ -241,7 +241,7 @@ y = as.matrix(expression.sel)
 x = x >0 
 
 ## force value to be zero if they are lower than the background
-y[y<0] = 0
+#y[y<0] = 0
 
 Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
 jj2test = match(Example2test, colnames(y))
@@ -253,6 +253,46 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
+########################################################
+########################################################
+# Section: glmnet with global alpha parameter or gene-specific alpha parameters
+########################################################
+########################################################
+require(glmnet)
+
+TEST.glmnet.gene.specific.alpha = FALSE
+
+#Methods2test = c("cv.lambda.1se", "bic", "aic", "aicc")
+Methods2test = c("bic")
+
+alphas = c(0.05,seq(0.1, 1, by= 0.1))
+#alphas = c(0.1)
+lambda = 10^seq(-4, 2, length.out = 200)
+nlambda = 200;
+
+source("select_tuningParams_elasticNet.R")
+
+if(TEST.glmnet.gene.specific.alpha) {testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_gene_specific_alpha");
+}else{testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_global_alpha"); }
+if(!dir.exists(testDir)) dir.create(testDir)
+
+for(method in Methods2test)
+{
+  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
+                   "_fitting.", fitting.space, 
+                   "_glmnet_global_alpha_method_select_tuning_parameters_TEST_", method,
+                   ".pdf")
+  
+  pdf(pdfname, width=16, height = 10)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(mfrow=c(1, 1))
+  
+  run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, nlambda = nlambda,
+                                      Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
+  
+  dev.off()
+  
+}
 
 
 ########################################################
@@ -316,43 +356,4 @@ if(TEST.gcdnet.global.lambda2){
   }
    
 }
-
-########################################################
-########################################################
-# Section: glmnet with global alpha parameter or gene-specific alpha parameters
-########################################################
-########################################################
-require(glmnet)
-
-TEST.glmnet.gene.specific.alpha = TRUE
-
-Methods2test = c("cv.lambda.1se")
-
-alphas = c(0.01, 0.02, 0.05,seq(0.1, 1, by= 0.05))
-#alphas = c(0.1)
-lambda = 10^seq(-4, 2, length.out = 200)
-
-source("select_tuningParams_elasticNet.R")
-
-if(TEST.glmnet.gene.specific.alpha) {testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_gene_specific_alpha");
-}else{testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_global_alpha"); }
-if(!dir.exists(testDir)) dir.create(testDir)
-
-for(method in Methods2test)
-{
-  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
-                   "_fitting.", fitting.space, 
-                   "_glmnet_global_alpha_method_select_tuning_parameters_", method,
-                   ".pdf")
-  
-  pdf(pdfname, width=16, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(1, 1))
-  
-  run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
-  
-  dev.off()
-  
-}
-
 
