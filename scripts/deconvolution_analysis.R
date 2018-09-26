@@ -69,6 +69,7 @@ if(Use.mergedFractionMatrix){
 ######################################
 ######################################
 if(!Use.mergedExpressionMatrix){
+  
   load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
   jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
   total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
@@ -77,6 +78,8 @@ if(!Use.mergedExpressionMatrix){
   ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
   colnames(xx) = c('whole.body', 'background', ncs) 
   
+  #write.csv(cpm.piRNA.bc, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_replicates.csv")
+  #write.csv(cpm.piRNA.bc.meanrep, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_averageRepliciates.csv")
   ####################
   ## here we transform the gene expression by e'= (expression-background)/background 
   # then e' = 0 if e'<0 or e'<1; 
@@ -231,10 +234,6 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
 # the glmnet will be run for each gene, because the group lasso is not desirable
 ######################################
 ######################################
-require(glmnet)
-require(gcdnet)
-library("pheatmap")
-library("RColorBrewer")
 
 x=as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
@@ -261,7 +260,9 @@ rownames(res) = colnames(x)
 ########################################################
 ########################################################
 require(glmnet)
-
+require(gcdnet)
+library("pheatmap")
+library("RColorBrewer")
 TEST.glmnet.gene.specific.alpha = FALSE
 
 #Methods2test = c("cv.lambda.1se", "bic", "aic", "aicc")
@@ -304,6 +305,9 @@ for(method in Methods2test)
 ########################################################
 TEST.gcdnet.global.lambda2 = TRUE
 if(TEST.gcdnet.global.lambda2){
+  require(gcdnet)
+  library("pheatmap")
+  library("RColorBrewer")
   
   testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_gcdnet_tuning_global_lambda2")
   if(!dir.exists(testDir)) dir.create(testDir)

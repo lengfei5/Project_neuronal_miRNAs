@@ -152,7 +152,7 @@ select.tuning.parameters.for.gcdnet = function(x, y,lambda = NULL, lambda2 = 0.1
 # and the original paper comes from is following:
 # DEGREES OF FREEDOM IN LASSO PROBLEMS By Ryan J. Tibshirani and Jonathan Taylor1
 ###############################
-estimate.elasticNet.df <-function(xx, fit)
+estimate.elasticNet.df <-function(xx, alpha = 0,  fit)
 {
   xx <- (cbind(1, xx))
   dfs <- NULL
@@ -167,7 +167,7 @@ estimate.elasticNet.df <-function(xx, fit)
       if(length(kk)==1) {
         dfs = c(dfs, 1)
       }else{
-        dfs <-c(dfs, sum(diag(xx[,kk] %*% solve(t(xx[ ,kk]) %*% xx[,kk] + l*diag(ncol(xx[,kk])))%*% t(xx[,kk]))))
+        dfs <-c(dfs, sum(diag(xx[,kk] %*% solve(t(xx[ ,kk]) %*% xx[,kk] + l*(1.0-alpha)*diag(ncol(xx[,kk])))%*% t(xx[,kk]))))
       }
     }
   }
@@ -204,7 +204,7 @@ calcluate.loglikelihood.glmnet = function(xx, yy, fit, use.deviance.glmnet = TRU
 # funtion to select tuning parameter for glmnet using methods, 
 # cv.lambda.1se, bic, aic, ebic, hbic ...
 ###############################
-select.tuning.parameters.for.glmnet = function(xx, yy, fit, cv.fit, method = c("cv.lambda.1se"))
+select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit, method = c("cv.lambda.1se"))
 {
   # xx = x; yy = y[,n];
   # coef(fit, s=cv.fit$lambda.1se);
@@ -215,10 +215,14 @@ select.tuning.parameters.for.glmnet = function(xx, yy, fit, cv.fit, method = c("
       myCoefs <- coef(fit, s=cv.fit$lambda.min);
       
     }else{
-      #n.var = fit$df;
+      #n.var = (fit$df + 1);
       n.data = length(yy);
-      n.var = estimate.elasticNet.df(xx, fit)
-      loglike = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = TRUE)
+      n.var = estimate.elasticNet.df(xx, alpha = alpha,  fit)
+      # plot((fit$df+1), n.var); abline(0, 1, lwd=2.0, col='red')
+      #loglike.glment = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = TRUE)
+      loglike = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = FALSE)
+      
+      # plot(loglike.glment, loglike.mse);abline(0, 1, lwd=2.0, col='red')
       
       if(method == "bic"){
         crits = -2*loglike + n.var *log(n.data)
@@ -232,6 +236,8 @@ select.tuning.parameters.for.glmnet = function(xx, yy, fit, cv.fit, method = c("
         crits = -2*loglike + 2*n.var + (2*nvar*(nvar+1))/(n.data-nvar-1);
         optim.crits = which(crits==min(crits))
       }
+      
+      plot(fit, label = TRUE); abline(v= c(cv.fit$lambda.min, cv.fit$lambda.1se)); abline(v=c(fit$lambda[optim.crits]), col='red')
       
       myCoefs <- coef(fit, s=fit$lambda[optim.crits]);
       
@@ -257,7 +263,7 @@ select.tuning.parameters.for.glmnet = function(xx, yy, fit, cv.fit, method = c("
 run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, nlambda = 100,
                                                Gene.Specific.Alpha = TRUE,  
                                                method = "cv.lambda.1se",   
-                                                omit.BIC = TRUE,  plot.crit.bic = TRUE)
+                                               omit.BIC = TRUE,  plot.crit.bic = TRUE)
 {
   require(glmnet)
   library("pheatmap")
@@ -270,16 +276,19 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
   grouped = FALSE
   cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
   
+  
   if(!Gene.Specific.Alpha){
     ###############################
     # global alpha parameter is tested in glmnet
     # so start the loop with alphas 
     # but it does not work well
     ###############################
+    
+    
     for(alpha in alphas)
     {
       cat("alpha --", alpha, "----------\n")
-      # alpha = 0.05; lambda = NULL; nlambda = 200; method = "bic"
+      # alpha = 0.7; lambda = NULL; nlambda = 200; method = "bic"
       
       res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
       colnames(res) = colnames(y)
@@ -287,7 +296,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
       
       for(n in 1:ncol(y))
       {
-        # n = 1
+        # n = 2
         if(is.null(lambda)){
           cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
@@ -303,7 +312,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
         fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
                    standardize=standardize, standardize.response=standardize.response, intercept=intercept)
         
-        myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], fit, cv.fit, method = method)
+        myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
         
         res[, n] = as.numeric(myCoefs)[-1]
         
@@ -431,6 +440,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
              cluster_cols=FALSE, main = paste0("gene-specific alpha - method : ", method), na_col = "gray30",
              color = cols)
     
+    return(res)
   }
   
 }

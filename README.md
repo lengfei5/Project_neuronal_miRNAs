@@ -8,19 +8,23 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - the conclusion is not very clear; because the highly enriched guys are not very highly expressed in the untreated samples, suggesting they are not simply due to the unefficient removal for unmethylated ones in the oxidation step
     - But it is clear that in the WT background, since the oxidation is shared by more species, e.g. siRNAs, piRNAs; consequently, the oxidation efficiency is lower for miRNAs. So the log2FC in WT is always lower than the log2FC in the henn1.mutant. But there are are some particular guys, which can be highly methylated (probably) already in the background. The reason could be the Chiara's assumption.
     
-  - [ ] Double check the batch correction works
-    - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
-    - The reason requires further understanding of batch correction methods.
-    - double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
-    - By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
-    
   - [x] Select tuning parameter for elastic-net penalty   
     - [x] Test a global parameter lambda2 for ridge and gene-specific parameter lambda1 for lasso with gcdnet 
     - [x] Test gene-specifc parameter alpha, find the method to select the optimal alpha for each gene
       - test adaptive elastic-net and extract results from the `msaenet` function
       - use the cv to select alpha, specifically, prefix a vector of alpha, and then run cv.glment and find the minimum of MSE; finally, the alpha yielding the lowest MSE will be selected  
-  - [x] After testing, one conclusion drawn is that the global alpha in glment works better than other choices, namely, global lambda2 in gcdnet and gene-specific alpha in glmnet  
-  
+  - [x] After testing, one conclusion drawn is that the global alpha in glment works better than other choices, namely, global lambda2 in gcdnet and gene-specific alpha in glmnet until now;
+      - “one-standard-error” rule turns out to be more efficient way to have sparse model, even compared with BIC, at least for mir7-91 example
+      - so at the end, the global alpha and one-standard-error method is chosen to fit the data
+      - [x] try BIC, AIC, EBIC with propre degree of freedom for gcdnet with global lambda2
+      - [x] try BIC, AIC, EBIC for glmnet with global alpha
+    
+   - [ ] Double check the batch correction works and improve the piRNA normalization by using individual piRNA read count
+    - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
+    - The reason requires further understanding of batch correction methods.
+    - double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
+    - By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
+    
   - [ ] Integrate the sample qualities into the linear model
   
   - [ ] Optimize the fitting and parameter to have final results
