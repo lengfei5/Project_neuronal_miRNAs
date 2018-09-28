@@ -19,6 +19,7 @@ This reprosition is for the deconvolution analysis for Chiara's project
       - [x] try BIC, AIC, EBIC with propre degree of freedom for gcdnet with global lambda2
       - [x] try BIC, AIC, EBIC for glmnet with global alpha
     
+   
    - [ ] Double check the batch correction works and improve the piRNA normalization by using individual piRNA read count
     - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
     - The reason requires further understanding of batch correction methods.    

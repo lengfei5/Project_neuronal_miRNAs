@@ -540,6 +540,77 @@ run.glmnet.for.coarse.groups = function(x, y, method = "lasso", pval.cutoff=0.1)
   
 }
 
+########################################################
+########################################################
+# Section: test the gdcnet for elastic-net
+########################################################
+########################################################
+########################################################
+########################################################
+# Section: gcdnet with global lambda2 parameter
+########################################################
+########################################################
+TEST.gcdnet.global.lambda2 = FALSE
+if(TEST.gcdnet.global.lambda2){
+  require(gcdnet)
+  library("pheatmap")
+  library("RColorBrewer")
+  
+  testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_gcdnet_tuning_global_lambda2")
+  if(!dir.exists(testDir)) dir.create(testDir)
+  
+  require(gcdnet)
+  source("select_tuningParams_elasticNet.R")
+  
+  cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+  
+  lambda2s = c(seq(0.01, 0.09, by=0.01), seq(0.1, 0.5, by=0.05))
+  lambda = 10^seq(-4, 2, length.out = 200)
+  
+  for(method in c("cv.lambda.1se"))
+  {
+    pdfname = paste0(testDir, "deconv_test", version.analysis, 
+                     "_fitting.", fitting.space, "_global_lambda2_",lambda2, "_method4crit_", method, ".pdf")
+    
+    pdf(pdfname, width=16, height = 10)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    par(mfrow=c(1, 1))
+    
+    for(lambda2 in lambda2s)
+    {
+      # lambda2 = 0.2
+      cat("lambda2 --", lambda2, "----------\n")
+      #alpha = 0.7 # 0.001 is the default valu
+      for(n in 1:ncol(y))
+      {
+        # n = 1; lambda2 = lambda2s[1];
+        source("select_tuningParams_elasticNet.R")
+        main = paste0(" (lambda2=", signif(lambda2, d=2), ")::", colnames(y)[n]);
+        myCoefs = select.tuning.parameters.for.gcdnet(x, y[,n], lambda = lambda, lambda2=lambda2, nfold =10, method = method, omit.BIC = TRUE);
+        res[,n] = as.numeric(myCoefs$coefficients)
+        
+        #par(mfrow= c(1,1))
+        #plot(cv.fit, main = colnames(y)[n])
+        
+        #cat("---", colnames(res)[n], "---\n", 
+        #    paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n")
+        
+        #coef(cv.fit, s = "lambda.min")
+        #myCoefs[which(myCoefs != 0 ) ]               #coefficients: intercept included
+        #myCoefs@Dimnames[[1]][which(myCoefs != 0 ) ] #feature names: intercept included
+      }
+      pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+               cluster_cols=FALSE, main = paste0("lambda2 = ", lambda2, " - method : ", method), na_col = "gray30",
+               color = cols)
+      
+    }
+    
+    dev.off() 
+  }
+  
+}
+
+
 
 
 
