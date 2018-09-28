@@ -242,13 +242,15 @@ y = as.matrix(expression.sel)
 ## force value to be zero if they are lower than the background
 y[y<0] = 0
 
-if(!Use.coarse.neuronClass.FractionMatrix) 
-{
+if(!Use.coarse.neuronClass.FractionMatrix){
   x = x >0
   #Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
   Example2test = c("lsy-6", "mir-791", "mir-793")
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
+}else{
+  # write.csv(x, file = "/Volumes/groups/cochella/Chiara/table_cellNbs_in_Sensory_Motor_Inter_for_14_Samples.csv")
+  
 }
 
 res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
@@ -288,14 +290,14 @@ for(method in Methods2test)
   pdfname = paste0(testDir, "/deconv_test", version.analysis, 
                    "_fitting.", fitting.space, 
                    "_glmnet_global_alpha_method_select_tuning_parameters_", method,
-                   "_coarseNeuronGroups.pdf")
+                   ".pdf")
   
   pdf(pdfname, width=20, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
   keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, nlambda = nlambda, lambda = lambda,
-                                      Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha, plot.cluster.col = TRUE);
+                                      Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
   dev.off()
   
@@ -329,9 +331,7 @@ if(save.optimal.results.for.downstream.analysis){
   
   dev.off()
   
-  
 }
-
 
 
 ########################################################
