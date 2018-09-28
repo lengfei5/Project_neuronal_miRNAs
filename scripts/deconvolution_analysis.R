@@ -356,7 +356,6 @@ if(save.optimal.results.for.downstream.analysis){
   
 }
 
-
 ########################################################
 ########################################################
 # Section: gcdnet with global lambda2 parameter

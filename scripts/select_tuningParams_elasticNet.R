@@ -536,7 +536,6 @@ run.glmnet.for.coarse.groups = function(x, y, method = "lasso", pval.cutoff=0.1)
     res = res[[1]];
   }
   
-  
   return(res)
   
 }
