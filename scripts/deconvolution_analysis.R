@@ -87,6 +87,14 @@ if(Use.mergedFractionMatrix){
     colnames(cc) = rownames(coarseClass)
     rownames(cc) = colnames(coarseClass)
     
+    TEST.newcc = FALSE
+    if(TEST.newcc){
+      n = 14;
+      j = 2;
+      kk = which(cc[, j]>0)
+      sum(proportions[n,kk])
+    }
+    
     newcc = proportions %*% cc
     
     rownames(newcc) = c("Dopaminergic","Serotonergic","Glutamatergic", "Cholinergic", "GABAergic",  "Ciliatedsensory",
@@ -243,13 +251,29 @@ y = as.matrix(expression.sel)
 y[y<0] = 0
 
 if(!Use.coarse.neuronClass.FractionMatrix){
+  
   x = x >0
   #Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
   Example2test = c("lsy-6", "mir-791", "mir-793")
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
+  
 }else{
   # write.csv(x, file = "/Volumes/groups/cochella/Chiara/table_cellNbs_in_Sensory_Motor_Inter_for_14_Samples.csv")
+  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
+                   "_fitting.", fitting.space, 
+                   "_Lasso.pdf")
+  
+  pdf(pdfname, width=20, height = 12)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(mfrow=c(1, 1))
+  
+  source("select_tuningParams_elasticNet.R")
+  keep.coarse = run.glmnet.for.coarse.groups(x, y)
+  
+  dev.off()
+  
+  save(keep.coarse, file = paste0(RdataDir, "preliminary_results_for_Coarse_neuronGroups", version.analysis, ".Rdata"))
   
 }
 
@@ -265,7 +289,6 @@ rownames(res) = colnames(x)
 ########################################################
 ########################################################
 require(glmnet)
-require(gcdnet)
 library("pheatmap")
 library("RColorBrewer")
 TEST.glmnet.gene.specific.alpha = FALSE

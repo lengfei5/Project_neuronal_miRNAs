@@ -261,7 +261,7 @@ select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit,
 
 
 run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, nlambda = 100,
-                                               Gene.Specific.Alpha = TRUE,  
+                                               Gene.Specific.Alpha = FALSE,  
                                                method = "cv.lambda.1se",   
                                                plot.cluster.col = FALSE,
                                                omit.BIC = TRUE,  plot.crit.bic = TRUE)
@@ -288,7 +288,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
     #ii.alpha = 0;
     for(alpha in alphas)
     {
-      cat("alpha --", alpha, "----------\n")
+      cat("global alpha --", alpha, "----------\n")
       # alpha = 0.7; lambda = NULL; nlambda = 200; method = "bic"
       
       res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
@@ -500,3 +500,48 @@ select.tuning.parameters.using.msaenet = function(x, y)
            cluster_cols=FALSE, main = paste0("gene-specific alphas "),
            color = cols)
 }
+
+
+########################################################
+########################################################
+# Section: OLS for coarse neuron groups
+########################################################
+########################################################
+run.glmnet.for.coarse.groups = function(x, y, method = "lasso", pval.cutoff=0.1)
+{
+  res = matrix(0, nrow = ncol(x), ncol = ncol(y)) 
+  colnames(res) = colnames(y)
+  rownames(res) = colnames(x)
+  
+  if(method == "ols"){
+    cat("fitting the data with ols----")
+    
+    for(n in 1:ncol(y))
+    {
+      # n = 59;pval.cutoff=0.5
+      y.sel = y[, n]
+      x.y.sel = data.frame(x, y.sel)
+      model =  eval(parse(text = paste0("y.sel ~ ", paste0(colnames(x), collapse = " + "))))
+      
+      ff = summary(lm(model, data = x.y.sel))
+      coefs = coefficients(ff)[-1, ] # ignore the intercept
+      kk = which(coefs[,4]<pval.cutoff)
+      res[kk, n] = coefs[kk,1]
+    }
+  }
+  
+  if(method == "lasso"){
+    res = run.glmnet.select.tuning.parameters(x, y, alphas = c(1), method = "cv.lambda.1se", lambda = 10^seq(-3, 3, length.out = 1000),
+                                              plot.cluster.col = TRUE);
+    res = res[[1]];
+  }
+  
+  
+  return(res)
+  
+}
+
+
+
+
+
