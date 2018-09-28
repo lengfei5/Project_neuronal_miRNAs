@@ -30,7 +30,7 @@ version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
 
-version.analysis = "_20180920"
+version.analysis = "_20180928"
 
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 resDir = "../results/decomvolution_results/"
@@ -186,9 +186,10 @@ if(Manually.unifiy.sample.names.forMatrix){
 load(file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
                      version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
                      fitting.space,".Rdata"))
+
+# use coarse neuron group or not
 if(Use.coarse.neuronClass.FractionMatrix){
-  load(file = paste0(RdataDir,
-                "Tables_Coarse_neuronClasses_FractionMatrix_for_Sensory_Motor_Inter", 
+  load(file = paste0(RdataDir, "Tables_Coarse_neuronClasses_FractionMatrix_for_Sensory_Motor_Inter", 
                 version.Fraction.Matrix, ".Rdata"))
   proportions = newcc;
 }
@@ -205,7 +206,6 @@ if(fitting.space == "log2"){
   expression.sel = expression.sel[, sel.pan.neurons]
 }
 
-
 #expression.sel = log2(expression.sel)
 
 sels = match(rownames(expression.sel), rownames(proportions))
@@ -219,62 +219,15 @@ if(Data.complete){
 
 ####################
 ## double check the proprotion matrix and expression matrix
-## match the sample order in the proprotion matrix and expression matrix 
-## now manually (to change)
 ####################
 if(Check.ProprotionMatrix.ExpressionMatrix){
-  xx = proportions.sel;
-  xx[which(xx>0)] = 1
-  
-  yy = expression.sel;
-  #yy = expression.sel[c(3, 2, 4, 10, 6, 5, 7, 8, 9, 11, 12, 1), ];
-  #yy = proportions[c(index.sel, 12, 14), ]
-  
-  library("pheatmap")
-  library("RColorBrewer")
-  
+  source("miRNAseq_functions.R")
   pdfname = paste0(resDir, "/Heatmap_Proportiona_Expression_Matrix", version.analysis, ".pdf")
   pdf(pdfname, width=15, height = 6)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
-  # par(mfcol=c(1, 1))
-  
-  if(fitting.space == 'linear') {
-    logaxis = 'xy';
-    yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
-    
-    xx = xx[-1, -1];
-    yy = yy[-1,  ]
-    
-  }else{logaxis = ''}
-  
- 
-  pheatmap(xx, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=TRUE, 
-           color = c("lightgray", "blue"), legend = FALSE)
-  
-  pheatmap(yy, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, 
-           cluster_cols=TRUE, 
-           color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
-  
-  ## double check the expression matrix
-  par(mfrow = c(1, 1))
-  mm = match(c("Cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
-  plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", ylab = "sum of Cho, Glut, GABA, Dop and Ser")
-  abline(0, 1, col="red", lwd=2.0)
-  #abline(h=1, col="darkgray", lwd=2.0)
-  
-  text(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
-       pos = 1, offset = 0.4)
-  
-  par(mfrow = c(1, 2))
-  plot(t(expression.sel[match(c("Dopaminergic", "Ciliatedsensory"), rownames(expression.sel)), ]), log=logaxis)
-  abline(0, 1, lwd=2.0, col='red')
-  plot(t(expression.sel[match(c("Mechanosensory",  "unc.86"), rownames(expression.sel)), ]), log=logaxis)
-  abline(0, 1, lwd=2.0, col='red')
-  
+  Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.sel, fitting.space = "log2")
   dev.off()
-  
 }
 
 ######################################
@@ -378,7 +331,6 @@ if(save.optimal.results.for.downstream.analysis){
   
   
 }
-
 
 
 

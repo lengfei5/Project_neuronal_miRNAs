@@ -1107,3 +1107,52 @@ my.plotPCA = function(xx, design.matrix){
   
 }
 
+Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.sel, fitting.space = "log2")
+{
+  library("pheatmap")
+  library("RColorBrewer")
+  
+  xx = proportions.sel;
+  xx[which(xx>0)] = 1
+  
+  yy = expression.sel;
+  
+  
+  if(fitting.space == 'linear') {
+    logaxis = 'xy';
+    yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
+    
+    xx = xx[-1, -1];
+    yy = yy[-1,  ]
+    
+  }else{logaxis = ''}
+  
+  
+  pheatmap(xx, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=TRUE, 
+           color = c("lightgray", "blue"), legend = FALSE)
+  
+  pheatmap(yy, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE, 
+           cluster_cols=TRUE, 
+           color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
+  
+  ## double check the expression matrix
+  par(mfrow = c(1, 1))
+  mm = match(c("Cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
+  plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", ylab = "sum of Cho, Glut, GABA, Dop and Ser")
+  abline(0, 1, col="red", lwd=2.0)
+  #abline(h=1, col="darkgray", lwd=2.0)
+  
+  text(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
+       pos = 1, offset = 0.4)
+  
+  par(mfrow = c(1, 2))
+  plot(t(expression.sel[match(c("Dopaminergic", "Ciliatedsensory"), rownames(expression.sel)), ]), log=logaxis)
+  abline(0, 1, lwd=2.0, col='red')
+  plot(t(expression.sel[match(c("Mechanosensory",  "unc.86"), rownames(expression.sel)), ]), log=logaxis)
+  abline(0, 1, lwd=2.0, col='red')
+  
+}
+
+
+
