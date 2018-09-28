@@ -19,13 +19,15 @@ This reprosition is for the deconvolution analysis for Chiara's project
       - [x] try BIC, AIC, EBIC with propre degree of freedom for gcdnet with global lambda2
       - [x] try BIC, AIC, EBIC for glmnet with global alpha
     
-   
-   - [ ] Double check the batch correction works and improve the piRNA normalization by using individual piRNA read count
+  - [X] Double check the batch correction works 
     - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
     - The reason requires further understanding of batch correction methods.    
-    - [ ] double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
-    - [ ] By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
+    - [x] double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
+    - [x] By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
+    - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
     
+  - [ ] Improve the piRNA normalization by using individual piRNA read count
+  
   - [ ] Integrate the sample qualities into the linear model
   
   - [ ] Optimize the fitting and parameter to have final results

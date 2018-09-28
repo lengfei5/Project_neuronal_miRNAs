@@ -203,12 +203,13 @@ cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, meth
 cpm.piRNA.bc.limma = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'limma')
 cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'combat')
 
+#cpm.piRNA.bc.ratio = remove.batch.by.logratios(cpm.piRNA, design.matrix)
+
 if(Use.ComBat.for.batch.correction){
   cpm.piRNA.bc = cpm.piRNA.bc.combat
 }else{
   cpm.piRNA.bc = cpm.piRNA.bc.my
 }
-
 
 ## double check the batch correction
 pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_",  version.analysis, ".pdf")

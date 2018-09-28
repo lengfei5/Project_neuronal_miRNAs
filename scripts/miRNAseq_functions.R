@@ -603,6 +603,34 @@ average.biological.replicates = function(cpm)
   
 }
 
+
+########################################################
+########################################################
+# Section: functions to correct batch 
+########################################################
+########################################################
+remove.batch.by.logratios = function(cpm, design.matrix)
+{
+  # cpm = cpm.piRNA
+  yy = cpm
+  
+  for(n in 1:(nrow(design.matrix)/2))
+  {
+    jj = c((2*n-1), 2*n) 
+    jj.ref = jj[which(design.matrix$treatment[jj] == "untreated")]
+    jj.treated = setdiff(jj, jj.ref)
+    cat(colnames(cpm)[jj.ref], "-- vs. --", colnames(cpm)[jj.treated], "\n")
+    
+    yy[, jj.treated] = log2((yy[ ,jj.treated]+2^-6)/(yy[, jj.ref]+2^-6));
+    
+  }
+  
+  yy = yy[, which(design.matrix$treatment=="treated")]
+  
+  
+}
+
+
 remove.batch.using.N2.untreated = function(cpm, design.matrix, method = "linear.model")
 {
   # cpm = cpm.piRNA
@@ -789,6 +817,7 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
   }
   
 }
+
 
 calculate.pvalues.two.groups.overlapping = function(nb.total, nb.group.A, nb.group.B, nb.overlapping)
 {
