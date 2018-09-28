@@ -11,7 +11,20 @@
 library("pheatmap")
 library("RColorBrewer")
 source('miRNAseq_functions.R')
-RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
+
+Data.complete = TRUE
+fitting.space = "log2" ## linear or log2 transformed for expression matrix
+
+
+add.background.sample.in.fitting.linear.space = TRUE
+Use.mergedFractionMatrix = FALSE
+Use.coarse.neuronClass.FractionMatrix = TRUE
+
+Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
+
+Manually.unifiy.sample.names.forMatrix = TRUE
+Check.ProprotionMatrix.ExpressionMatrix = FALSE
+
 
 version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
@@ -19,19 +32,11 @@ version.EnrichscoreMatrix = "20180506"
 
 version.analysis = "_20180920"
 
+RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
 #testDir = paste0(resDir, "deconv_test_09_20_gcdnet_tuning_global_lambda2_cv/")
 #if(!dir.exists(testDir)) dir.create(testDir)
-
-Data.complete = TRUE
-fitting.space = "log2" ## linear or log2 transformed for expression matrix
-
-add.background.sample.in.fitting.linear.space = TRUE
-Use.mergedFractionMatrix = TRUE 
-Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
-Manually.unifiy.sample.names.forMatrix = TRUE
-Check.ProprotionMatrix.ExpressionMatrix = FALSE
 
 ######################################
 ######################################
@@ -44,23 +49,54 @@ if(Use.mergedFractionMatrix){
   proportions = newprop;
   
 }else{
-  load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", 
-                     version.Fraction.Matrix, ".Rdata"))
-  #write.csv(proportions, file = "../results/tables_for_decomvolution/proportion_matrix_for_Chiara.csv")
-  source('miRNAseq_functions.R')
+  if(!Use.coarse.neuronClass.FractionMatrix){
+    load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", 
+                       version.Fraction.Matrix, ".Rdata"))
+    #write.csv(proportions, file = "../results/tables_for_decomvolution/proportion_matrix_for_Chiara.csv")
+    source('miRNAseq_functions.R')
+    
+    pdfname = paste0(resDir, "/heatmap_for_merging_proportionaMatrix.pdf")
+    pdf(pdfname, width=15, height = 6)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    par(mfrow=c(1, 1))
+    
+    newprop = proportions.matrix.merging.neuronClass(proportions)
+    
+    dev.off()
+    
+    save(newprop, mapping, neurons, proportions, 
+         file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix_plus_mergedFractionMatrix", 
+                       version.Fraction.Matrix, ".Rdata"))
+  }else{
+    
+    load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", 
+                       version.Fraction.Matrix, ".Rdata"))
+    source('miRNAseq_functions.R')
+    library("openxlsx")
+    coarseClass = read.xlsx("../data/proportion_matrix_for_Coarse_neuron_classes.xlsx", rowNames = TRUE,
+                       sheet = 1, colNames = TRUE, skipEmptyRows = TRUE, skipEmptyCols = TRUE, na.strings = "NA")
+    mm = match(c("SENSORY", "MOTOR", "INTER"), rownames(coarseClass))
+    coarseClass = as.matrix(coarseClass[mm, ])
+    
+    coarseClass[which(is.na(coarseClass))] = 0
+    coarseClass[which(coarseClass== "1?")] = 1;
+    
+    coarseClass = data.frame(coarseClass, stringsAsFactors = TRUE)
+    cc = t(coarseClass)
+    cc = matrix(as.numeric(cc), nrow = nrow(cc), ncol = ncol(cc))
+    colnames(cc) = rownames(coarseClass)
+    rownames(cc) = colnames(coarseClass)
+    
+    newcc = proportions %*% cc
+    
+    rownames(newcc) = c("Dopaminergic","Serotonergic","Glutamatergic", "Cholinergic", "GABAergic",  "Ciliatedsensory",
+                              "Mechanosensory", "unc.86", "Pharyngeal", "ceh.14", "unc.42", "unc.3","ASE", "Pan.neurons")
+    
+    save(newcc, file = paste0(RdataDir,
+                              "Tables_Coarse_neuronClasses_FractionMatrix_for_Sensory_Motor_Inter", 
+                              version.Fraction.Matrix, ".Rdata"))
+  }
   
-  pdfname = paste0(resDir, "/heatmap_for_merging_proportionaMatrix.pdf")
-  pdf(pdfname, width=15, height = 6)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(1, 1))
-  
-  newprop = proportions.matrix.merging.neuronClass(proportions)
-  
-  dev.off()
-  
-  save(newprop, mapping, neurons, proportions, 
-       file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix_plus_mergedFractionMatrix", 
-                     version.Fraction.Matrix, ".Rdata"))
 }
 
 ######################################
@@ -150,13 +186,26 @@ if(Manually.unifiy.sample.names.forMatrix){
 load(file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
                      version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
                      fitting.space,".Rdata"))
+if(Use.coarse.neuronClass.FractionMatrix){
+  load(file = paste0(RdataDir,
+                "Tables_Coarse_neuronClasses_FractionMatrix_for_Sensory_Motor_Inter", 
+                version.Fraction.Matrix, ".Rdata"))
+  proportions = newcc;
+}
 
+### select genes of interest
 load(file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.EnrichscoreMatrix, ".Rdata"))
 enriched.list = colnames(enrich.matrix.sel)
 #enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
 
 mm = match((enriched.list), colnames(expression))
 expression.sel = expression[, mm]
+if(fitting.space == "log2"){
+  sel.pan.neurons = which(expression.sel[which(rownames(expression.sel)=="Pan.neurons"), ] > 1)
+  expression.sel = expression.sel[, sel.pan.neurons]
+}
+
+
 #expression.sel = log2(expression.sel)
 
 sels = match(rownames(expression.sel), rownames(proportions))
@@ -234,19 +283,20 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
 # the glmnet will be run for each gene, because the group lasso is not desirable
 ######################################
 ######################################
-
 x=as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
-
-x = x >0 
 
 ## force value to be zero if they are lower than the background
 y[y<0] = 0
 
-#Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
-Example2test = c("lsy-6", "mir-791", "mir-793")
-jj2test = match(Example2test, colnames(y))
-y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
+if(!Use.coarse.neuronClass.FractionMatrix) 
+{
+  x = x >0
+  #Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
+  Example2test = c("lsy-6", "mir-791", "mir-793")
+  jj2test = match(Example2test, colnames(y))
+  y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
+}
 
 res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
 colnames(res) = colnames(y)
@@ -264,11 +314,12 @@ require(gcdnet)
 library("pheatmap")
 library("RColorBrewer")
 TEST.glmnet.gene.specific.alpha = FALSE
+save.optimal.results.for.downstream.analysis = TRUE
 
 #Methods2test = c("cv.lambda.1se", "bic", "aic", "aicc")
 Methods2test = c("cv.lambda.1se")
 
-alphas = c(0.05,seq(0.1, 1, by= 0.05))
+alphas = c(seq(0.2, 1, by= 0.2))
 #alphas = c(0.1)
 lambda = 10^seq(-3, 3, length.out = 1000)
 nlambda = 400;
@@ -284,18 +335,51 @@ for(method in Methods2test)
   pdfname = paste0(testDir, "/deconv_test", version.analysis, 
                    "_fitting.", fitting.space, 
                    "_glmnet_global_alpha_method_select_tuning_parameters_", method,
-                   "_NewTest.pdf")
+                   "_coarseNeuronGroups.pdf")
   
-  pdf(pdfname, width=8, height = 10)
+  pdf(pdfname, width=20, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, nlambda = nlambda, lambda = lambda,
-                                      Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
+  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, nlambda = nlambda, lambda = lambda,
+                                      Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha, plot.cluster.col = TRUE);
   
   dev.off()
   
 }
+
+if(save.optimal.results.for.downstream.analysis){
+  
+  jj = which(alphas>=0.6 & alphas <0.8)
+  cat(jj, "\n")
+  for(n in 1:length(jj))  cat(keep[[jj[n]]], "\n")
+  
+  res = keep[[13]]
+  
+  save(res, file = paste0(RdataDir, "preliminary_results_for_Chiara_Recess_global_alpha_method_1se_alpha_0.7.Rdata"))
+  #testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_global_alpha_plots4recess"); }
+  #if(!dir.exists(testDir)) dir.create(testDir)
+  
+  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
+                   "_fitting.", fitting.space, 
+                   "_glmnet_global_alpha_method_select_tuning_parameters_", method,
+                   ".pdf")
+  pdf(pdfname, width=8, height = 12)
+  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  par(mfrow=c(1, 1))
+  cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(100)
+  
+  
+  pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=FALSE, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "white",
+           color = cols)
+  
+  dev.off()
+  
+  
+}
+
+
 
 
 ########################################################

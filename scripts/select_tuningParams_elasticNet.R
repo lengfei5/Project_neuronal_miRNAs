@@ -263,6 +263,7 @@ select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit,
 run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, nlambda = 100,
                                                Gene.Specific.Alpha = TRUE,  
                                                method = "cv.lambda.1se",   
+                                               plot.cluster.col = FALSE,
                                                omit.BIC = TRUE,  plot.crit.bic = TRUE)
 {
   require(glmnet)
@@ -283,8 +284,8 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
     # so start the loop with alphas 
     # but it does not work well
     ###############################
-    
-    
+    results = list();
+    #ii.alpha = 0;
     for(alpha in alphas)
     {
       cat("alpha --", alpha, "----------\n")
@@ -316,16 +317,27 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
         
         res[, n] = as.numeric(myCoefs)[-1]
         
-        cat("---------------\n", colnames(res)[n], ":\n", 
-            paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-            "---------------\n")
+        #cat("---------------\n", colnames(res)[n], ":\n", 
+        #    paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
+        #    "---------------\n")
       }
       
-      res[which(res==0)] = NA;
-      pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-               cluster_cols=FALSE, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
-               color = cols)
+      if( ! plot.cluster.col){
+        res[which(res==0)] = NA;
+        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 color = cols)
+      }else{
+        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 color = cols)
+        res[which(res==0)] = NA;
+      }
+      
+      results[[which(alphas==alpha)]] = res; 
     }
+    
+    return(results)
     
   }else{
     ###############################
