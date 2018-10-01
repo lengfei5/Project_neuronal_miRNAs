@@ -1,8 +1,481 @@
 #library(BSgenome.Dmelanogaster.UCSC.dm3)
 library(parallel)
 #options(scipen=999)
+########################################################
+########################################################
+# Section: here is the function to use for piRNA normalization
+########################################################
+########################################################
+###############################
+# the function used in the original pipeline
+# the last step to quantify the read counts and normalized read counts (cpm)
+###############################
+analysisAllmiRNA <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS)
+}
+
+###############################
+# in mirBase the pre_miRNA_5p3p is currently pre_miRNA... & normalizeCnt = TRUE (within miRNA)
+# this is the function commonly used for Chiara's data
+###############################
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: setwd("~/shared/Cochella.GRP/Chiara.Alberti/miRNA_R3289/")
+#R: setwd("~/clustertmp/Chiara.Alberti/")
+#R: analysisAllmiRNABase(processes = 6, aboveIsoCnt = 1)
+#R: setwd("/clustertmp/bioinfo/thomas/Ivica.Sowemimo")
+#R: analysisAllmiRNABase(file.suffix = "tailor.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 1)
+#R: system("mv allProperties.miRNA.tf0.12.ic1.txt allProperties.miRNA.tf0.12.ic1.dm.txt")
+#R: analysisAllmiRNABase(file.suffix = "mm10.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 1)
+#R: system("mv allProperties.miRNA.tf0.12.ic1.txt allProperties.miRNA.tf0.12.ic1.mm.txt")
+#R: analysisAllmiRNABase(file.suffix = "tailor.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 0)
+#R: system("mv allProperties.miRNA.tf0.12.txt allProperties.miRNA.tf0.12.dm.txt")
+#R: analysisAllmiRNABase(file.suffix = "mm10.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 0)
+#R: system("mv allProperties.miRNA.tf0.12.txt allProperties.miRNA.tf0.12.mm.txt")
+#R: analysisAllmiRNABase(file.suffix = "PlusDm3.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 1)
+#R: analysisAllmiRNABase(file.suffix = "PlusDm3.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 0)
+analysisAllmiRNABase <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, 
+                                 annotWithAS=TRUE, normalizeCnt = TRUE, aboveIsoCnt = 0)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", includePrimary = "pre_miRNA", 
+              tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt, aboveIsoCnt = aboveIsoCnt)
+}
+
+analysisAllpiRNA <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", 
+                             file.suffixSecondary="bam.seqCnt.txt.gz", 
+                             includePrimary="NONE", 
+                             includeType = c("piRNA"), 
+                             tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, 
+              output.middleName = "piRNA", 
+              file.suffixSecondary = file.suffixSecondary, 
+              tailFilter = tailFilter, includePrimary = includePrimary, 
+              includeType = includeType, 
+              aboveIsoCnt = aboveIsoCnt, 
+              processes = processes, 
+              annotWithAS=annotWithAS)
+}
+
+analysisAllWithinMiRNA <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "WithinMiRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt)
+}
 
 
+analysisAll <- function(file.suffixPrimary, output.middleName, file.suffixSecondary = NULL, 
+                        normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", 
+                                         "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS",
+                                         "mRNA", "mRNA_AS", "intron", "intron_AS"), 
+                        tailFilter = 0.12, includePrimary = "pre_miRNA_5p3p", includeType = NULL, excludeId = NULL, excludeType = NULL,
+                        lenDis = 18:30, aboveIsoCnt = 0, processes = 1, spliceSite = FALSE,
+                        last8mer = FALSE, annotWithAS = TRUE, minLength=-1, countColumn=countColumn)
+{
+  seqCnt.all <- list.files(".", paste0(file.suffixPrimary, "$"))
+  
+  if (processes == 1)
+  {
+    miRNA.list <- lapply(seqCnt.all, function(seqCnt.file)
+    {
+      show(seqCnt.file)
+      seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
+      return(analyseSeqCnt(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer))
+    })
+  } else {
+    cl <- makeCluster(rep("localhost", (processes-1)),
+                      type = "SOCK"
+    )
+    
+    #export all functions to workers
+    ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv))
+    clusterExport(cl, ex)
+    
+    miRNA.list <- parLapply(cl, seqCnt.all, function(seqCnt.file)
+    {
+      seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
+      return(analyseSeqCnt(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer))
+    })
+    stopCluster(cl)
+  }
+  
+  miRNA.list <- Filter(Negate(is.null), miRNA.list)
+  miRNA <- Reduce(function(x,y) merge(x, y, all = TRUE, by = c("chr", "p5", "strand", "gname", "isoSeed")), miRNA.list)
+  for ( i in 1:ncol(miRNA))
+  {
+    if (is.list(miRNA[,i]))
+    {
+      miRNA[,i] <- vapply(miRNA[,i], paste, collapse = ", ", character(1L)) #if one column is a list ...
+    }
+  }
+  
+  if (tailFilter == 1)
+  {
+    if (aboveIsoCnt > 0)
+    {
+      write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf1.ic",aboveIsoCnt,".",countColumn,".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    } else {
+      write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf1.",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    }
+  } else {
+    if (aboveIsoCnt > 0)
+    {
+      write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf", tailFilter, ".ic",aboveIsoCnt, ".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    } else {
+      write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf", tailFilter, ".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    }
+  }
+}
+
+###############################
+# other counting function for special purposes 
+###############################
+analyseSeqCnt.modular <- function(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer, module)
+{
+  if (is.null(module))
+  {
+    d <- isoform5pAllInOne(seqCnt=seqCnt, lenDis = lenDis, aboveIsoCnt=aboveIsoCnt, last8mer=last8mer)
+  } else {
+    d <- isoform5pAllInOne.modular(seqCnt=seqCnt, lenDis = lenDis, aboveIsoCnt=aboveIsoCnt, last8mer=last8mer, module = module)
+  }
+  
+  cname <- colnames(d)
+  sampleID <- seqCnt.file
+  sampleID <- gsub(".*#(\\d+)_.*", "\\1", sampleID,  perl = TRUE)
+  sampleID <- gsub("(\\d+)_.*", "\\1", sampleID,  perl = TRUE)
+  sampleID <- gsub(".trimmed.*", "", sampleID,  perl = TRUE)
+  cname[6:length(d)] <- gsub("$", paste(".", sampleID, sep = ""), cname[6:length(d)], perl = TRUE)
+  colnames(d) <- cname
+  
+  return(d)
+}
+
+analysisAll.modular <- function(file.suffixPrimary, output.middleName, file.suffixSecondary = NULL, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS"), tailFilter = 0.12, includePrimary = "pre_miRNA_5p3p", includeType = NULL, excludeId = NULL, excludeType = NULL, lenDis = 18:30, aboveIsoCnt = 0, processes = 1, spliceSite = FALSE, last8mer = FALSE, annotWithAS=TRUE, module = NULL, minLength=-1, countColumn=countColumn)
+{
+  seqCnt.all <- list.files(".", paste0(file.suffixPrimary, "$"))
+  
+  if (processes == 1)
+  {
+    miRNA.list <- lapply(seqCnt.all, function(seqCnt.file)
+    {
+      show(seqCnt.file)
+      seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
+      return(analyseSeqCnt.modular(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer, module=module))
+    })
+  } else {
+    cl <- makeCluster(rep("localhost", (processes-1)),
+                      type = "SOCK"
+    )
+    
+    #export all functions to workers
+    ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv))
+    clusterExport(cl, ex)
+    
+    miRNA.list <- parLapply(cl, seqCnt.all, function(seqCnt.file)
+    {
+      seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
+      return(analyseSeqCnt.modular(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer, module=module))
+    })
+    stopCluster(cl)
+  }
+  
+  miRNA <- Reduce(function(x,y) merge(x, y, all = TRUE, by = c("chr", "p5", "strand", "gname", "isoSeed")), miRNA.list)
+  for ( i in 1:ncol(miRNA))
+  {
+    if (is.list(miRNA[,i]))
+    {
+      miRNA[,i] <- vapply(miRNA[,i], paste, collapse = ", ", character(1L)) #if one column is a list ...
+    }
+  }
+  
+  if (tailFilter == 1)
+  {
+    if (aboveIsoCnt > 0)
+    {
+      write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf1.ic",aboveIsoCnt,".",countColumn,".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    } else {
+      write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf1.",countColumn,".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    }
+  } else {
+    if (aboveIsoCnt > 0)
+    {
+      write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf", tailFilter, ".ic",aboveIsoCnt,".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    } else {
+      write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf", tailFilter, ".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
+    }
+  }
+}
+
+
+#source("~/development/smallRNA/functions.miRNASummarize.noFixation.R");
+#setwd("/clustertmp/bioinfo/thomas/Chiara.Alberti_R3859")
+#setwd("/clustertmp/bioinfo/thomas/miRNA_R4042")
+#analysisAllmiRNABase.modular(processes = 6, normalizeCnt=FALSE)
+#system("mv allProperties.total.miRNA.tf0.12.count.txt allProperties.total.miRNA.tf0.12.countRaw.txt")
+#analysisAllmiRNABase.modular(processes = 6)
+#analysisAllmiRNABase.modular(processes = 6, normalizeCnt=FALSE, countColumn="UMIfr")
+#system("mv allProperties.total.miRNA.tf0.12.UMIfr.txt allProperties.total.miRNA.tf0.12.UMIfrRaw.txt")
+#analysisAllmiRNABase.modular(processes = 6, countColumn="UMIfr")
+#analysisAllmiRNABase.modular(processes = 6, normalizeCnt=FALSE, countColumn="UMInum")
+#system("mv allProperties.total.miRNA.tf0.12.UMInum.txt allProperties.total.miRNA.tf0.12.UMInumRaw.txt")
+#analysisAllmiRNABase.modular(processes = 6, countColumn="UMInum")
+
+analysisAllmiRNABase.modular <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE, aboveIsoCnt = 0, countColumn = "count")
+{
+  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "miRNA", includePrimary = "pre_miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt, aboveIsoCnt = aboveIsoCnt, countColumn=countColumn, module="total")
+}
+
+
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA/")
+analysisAllPreMiRNA <- function(file.suffix="bam.seqCntPreMirna.txt.gz", tailFilter = 0.05, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "premiRNA", includePrimary = c("pre_miRNA"), tailFilter = tailFilter, lenDis = 45:70, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
+}
+
+analysisAllmiRNA.modular <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, module = NULL)
+{
+  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, module=module)
+}
+
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Veronika.Herzog/miRNA/ath_R4120/monoAT")
+#R: analysisAllmiRNAWithin.modular(processes=16, tailFilter=1, module = c("isoCntMonotail", "isoCntTailLenMonotail"), annotWithAS = TRUE, includePrimary = c("pre_miRNA"))
+analysisAllmiRNAWithin.modular <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, module = NULL, normalizeCnt = TRUE, includePrimary = c("pre_miRNA_5p3p"))
+{
+  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, module=module, normalizeCnt=normalizeCnt, includePrimary = includePrimary)
+}
+
+
+analysisAllPreMiRNA.modular <- function(file.suffix="bam.seqCntPreMirna.txt.gz", tailFilter = 0.05, processes = 1, annotWithAS=TRUE, module=NULL, normalizeCnt = TRUE)
+{
+  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "premiRNA", includePrimary = c("pre_miRNA"), tailFilter = tailFilter, lenDis = 45:70, processes = processes, annotWithAS=annotWithAS, module=module, normalizeCnt = normalizeCnt)
+}
+
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: analysisAllmiRNAPlusEsi(processes=16)
+#R: analysisAllmiRNAPlusEsi( aboveIsoCnt = 10, processes=16)
+analysisAllmiRNAPlusEsi <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("pre_miRNA_5p3p", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "miRNAPlusEsi", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}
+
+analysisAllGenomePlus <- function(file.suffix = "bam.seqCnt.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE, aboveIsoCnt = -1)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", includePrimary = "pre_miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt, aboveIsoCnt = aboveIsoCnt)
+}
+
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: analysisAllsmallRNA(aboveIsoCnt = 1, processes=6) #ATTENTION: fast out of memory
+#R: analysisAllsmallRNA( aboveIsoCnt = 10, processes=6)
+analysisAllsmallRNA <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", 
+                                includeType = c("pre_miRNA_5p3p", "transposable_element", "transposable_element_AS", 
+                                                "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "smallRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}
+
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: analysisAllsmallRNANoMiRNA(aboveIsoCnt = 1, processes=6) #ATTENTION: fast out of memory
+#R: analysisAllsmallRNANoMiRNA( aboveIsoCnt = 10, processes=6)
+analysisAllsmallRNANoMiRNA <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("transposable_element", "transposable_element_AS", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "smallRNA.NoMiRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}
+
+
+analysisAllGFP <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("gfp"), tailFilter = 0.07, aboveIsoCnt = -1, processes = 1, annotWithAS=FALSE, normalizeCnt = TRUE, construct=NULL)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "3prime", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt, lenDis = 29:46)
+  
+  if (is.null(construct))
+  {
+    construct <- includeType
+  }
+  
+  ap <- read.delim(paste0("allProperties.3prime.tf", tailFilter, ".txt"))
+  ap$strand <- chartr("+-", "-+", ap$strand)
+  cn <- colnames(ap)
+  cn <- gsub("p3", "pTHREE", cn)
+  cn <- gsub("p5", "p3", cn)
+  cn <- gsub("pTHREE", "p5", cn)
+  colnames(ap) <- cn
+  library("Biostrings")
+  gfp <- readDNAStringSet(paste0(construct, ".fa"))
+  siRNA <- apply(ap[,c("chr", "p3", "strand")], 1, function(l)
+  {
+    if (l["strand"] == "+")
+    {
+      start=as.numeric(l["p3"]) - 10
+      end=as.numeric(l["p3"])+10
+      if (start < 1)
+        start <- 1
+      if (end > width(gfp)[names(gfp) == l["chr"]])
+        end <- width(gfp)[names(gfp) == l["chr"]]
+      return(as.character(reverseComplement(subseq(gfp[l["chr"]], start=start, end=end))))
+    } else {
+      start=as.numeric(l["p3"]) - 9
+      end=as.numeric(l["p3"])+11
+      if (start < 1)
+        start <- 1
+      if (end > width(gfp)[names(gfp) == l["chr"]])
+        end <- width(gfp)[names(gfp) == l["chr"]]
+      return(as.character(subseq(gfp[l["chr"]], start=start, end=end)))
+    }
+  })
+  ap <- cbind(siRNA, ap)
+  write.table(ap, file=paste0("allProperties.3prime.tf", tailFilter, ".txt"), quote=FALSE, row.names=FALSE, sep="\t")
+}
+
+#Raphael.Manzenreither 3' GFP
+#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither")
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: analysisAllGFPmonoT(processes=6)
+#R: analysisAllGFPmonoT(processes=6, includeType=c("virus"))
+#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Raphael.Manzenreither/constructs_R4592/GFP")
+#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/GFP/")
+#R: analysisAllGFPmonoT(processes=6, includeType=c("pre_miRNA"))
+analysisAllGFPmonoT <- function(file.suffixPrimary = "bam.monoT.seqCnt.txt.gz", file.suffixSecondary="bam.monoT.seqCnt.txt.gz", includePrimary="NONE", includeType = c("gfp"), tailFilter = 1, aboveIsoCnt = -1, processes = 1, annotWithAS=FALSE, normalizeCnt = TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "3primeMonoT", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt, lenDis = 29:46)
+  
+  ap <- read.delim(paste0("allProperties.3primeMonoT.tf", tailFilter, ".txt"))
+  ap$strand <- chartr("+-", "-+", ap$strand)
+  cn <- colnames(ap)
+  cn <- gsub("p3", "pTHREE", cn)
+  cn <- gsub("p5", "p3", cn)
+  cn <- gsub("pTHREE", "p5", cn)
+  colnames(ap) <- cn
+  library("Biostrings")
+  gfp <- readDNAStringSet(paste0(includeType, ".fa"))
+  siRNA <- apply(ap[,c("chr", "p3", "strand")], 1, function(l)
+  {
+    if (l["strand"] == "+")
+    {
+      start=as.numeric(l["p3"]) - 10
+      end=as.numeric(l["p3"])+10
+      if (start < 1)
+        start <- 1
+      if (end > width(gfp)[names(gfp) == l["chr"]])
+        end <- width(gfp)[names(gfp) == l["chr"]]
+      return(as.character(reverseComplement(subseq(gfp[l["chr"]], start=start, end=end))))
+    } else {
+      start=as.numeric(l["p3"]) - 9
+      end=as.numeric(l["p3"])+11
+      if (start < 1)
+        start <- 1
+      if (end > width(gfp)[names(gfp) == l["chr"]])
+        end <- width(gfp)[names(gfp) == l["chr"]]
+      return(as.character(subseq(gfp[l["chr"]], start=start, end=end)))
+    }
+  })
+  ap <- cbind(siRNA, ap)
+  write.table(ap, file=paste0("allProperties.3primeMonoT.tf", tailFilter, ".txt"), quote=FALSE, row.names=FALSE, sep="\t")
+}
+
+
+#R: source("~/development/smallRNA/functions.miRNASummarize.R")
+#R: analysisAllTransposable(aboveIsoCnt=10, processes=6)
+#R: analysisAllTransposable(aboveIsoCnt=1, processes=6) #ATTENTION: fast out of memory
+analysisAllTransposable <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("transposable_element", "transposable_element_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "transposable", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}
+
+
+analysisAllcisNAT <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("cisNATs", "cisNATs_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "cisNAT", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}
+
+
+analysisAllStructured <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "structured", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}
+
+analysisAllVirus <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("virus", "virus_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE, normalizeCnt=FALSE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "viruses", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt)
+}
+
+
+analysisAllFeat <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("mapped_reads", "mito", "rRNA", "rRNA_AS", "tRNA", "tRNA_AS", "good_reads", "pre_miRNA_5p3p", "pre_miRNA_5p3p_AS", "pre_miRNA", "pre_miRNA_AS", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "pseudogene", "pseudogene_AS", "ncRNA", "ncRNA_AS", "snoRNA", "snoRNA_AS", "snRNA", "snRNA_AS", "mRNA", "mRNA_AS", "intron", "intron_AS"), tailFilter = 0.12, aboveIsoCnt = 10, processes = 1, annotWithAS=TRUE, normalizeCnt="all", lenDis = 18:30)
+{
+  
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "allFeat", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt, lenDis=lenDis)
+}
+
+
+analysisAllsiRNAGFP <- function(file.suffix = "seqCnt.txt.gz", includePrimary="siRNA", tailFilter = 0.12, processes = 1, normalizeCnt=TRUE, lenDis = 15:45, annotWithAS=TRUE, minLength = 10)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "siRNA.minLength10", tailFilter = tailFilter, processes = processes, normalizeCnt=normalizeCnt, annotWithAS=annotWithAS, lenDis=lenDis, includePrimary=includePrimary, minLength=minLength)
+}
+
+analysisAllmiRNARaphael <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS = annotWithAS, normalizeCnt = normalizeCnt)
+}
+
+analysisAllesiRNAdsRNARaphael <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("structured_loci", "structured_loci_AS", "dsRNA", "dsRNA_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "esiRNA.dsRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
+}
+
+analysisAllesiRNARaphael <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = 10, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "esiRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
+}
+
+analysisAlldsRNARaphael <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("dsRNA", "dsRNA_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "dsRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
+}
+
+
+analysisAllpremiRNAPlusIntron <- function(file.suffixPrimary="bam.seqCntPreMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.05, includePrimary="pre_miRNA_5p3p", includeType = c("intron"), excludeId = NULL, aboveIsoCnt = 0, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "premiRNAPlusIntron", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 45:70, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}              
+
+analysisAllIntronSpliceSite <- function(file.suffixPrimary="bam.seqCntPreMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.05, includePrimary="NONE", includeType = c("intron"), excludeId = NULL, aboveIsoCnt = -1, processes = 1, normalizeCnt = "all", spliceSite = TRUE, last8mer = TRUE, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "intronSpliceSite", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 45:70, aboveIsoCnt = aboveIsoCnt, processes = processes, normalizeCnt = normalizeCnt, spliceSite = spliceSite, last8mer = last8mer, annotWithAS=annotWithAS)
+}              
+
+
+analysisAllConstructEsi <- function(file.suffixPrimary="bam.seqCntMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.12, includePrimary="construct", includeType = c("ago2_sRNA", "cis_NAT", "endo_siRNA"), excludeId = NULL, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "constructEsi", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 18:30, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}              
+
+
+analysisAllpremiRNAPlusIntronExcl <- function(file.suffixPrimary="bam.seqCntPreMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.05, includePrimary="pre_miRNA_5p3p", includeType = c("intron"), excludeId = NULL, excludeType = c("snoRNA", "tRNA"), aboveIsoCnt = 0, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "premiRNAPlusIntronExcl", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, excludeType = excludeType, lenDis = 45:70, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}              
+
+
+analysisAllmiRNATest <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNATest", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS)
+}
+
+analysisAllPreMiRNATest <- function(file.suffix="bam.seqCntPreMirna.txt.gz", tailFilter = 0.05, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "premiRNATest", tailFilter = tailFilter, lenDis = 45:70, processes = processes, annotWithAS=annotWithAS)
+}
+
+analysisAllmiRNAPlusEsiTest <- function(file.suffixPrimary="bam.seqCntMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", 
+                                        tailFilter = 0.12, includePrimary="pre_miRNA_5p3p", includeType = c("ago2_sRNA", "cis_NAT", "endo_siRNA"), excludeId = NULL, aboveIsoCnt = 0, processes = 1, annotWithAS=TRUE)
+{
+  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "miRNAPlusEsiTest", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 18:30, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
+}              
+
+########################################################
+########################################################
+# Section: some utility functions 
+########################################################
+########################################################
 as.num <- function(..)
   {
     as.numeric(as.character(..))
@@ -826,8 +1299,9 @@ isoform5pAllInOne.modular <- function(seqCnt, lenDis, aboveIsoCnt, last8mer = FA
   }
 
 
-getSeqCnt <- function(seqCnt.file, file.suffixPrimary, file.suffixSecondary, normalizeCnt, tailFilter, includePrimary, includeType, excludeId, excludeType, spliceSite = FALSE, annotWithAS = TRUE, minLength=minLength, countColumn = "count")
-  {
+getSeqCnt <- function(seqCnt.file, file.suffixPrimary, file.suffixSecondary, normalizeCnt, tailFilter, includePrimary, includeType, 
+                      excludeId, excludeType, spliceSite = FALSE, annotWithAS = TRUE, minLength=minLength, countColumn = "count")
+{
 
 #    print(paste("seqCnt.file", seqCnt.file))
 #    print(paste("file.suffixPrimary", file.suffixPrimary))
@@ -1008,11 +1482,11 @@ getSeqCnt <- function(seqCnt.file, file.suffixPrimary, file.suffixSecondary, nor
           }
     
     return(seqCnt)
-  }
+}
 
 
 analyseSeqCnt <- function(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer)
-  {
+{
       d <- isoform5pAllInOne(seqCnt=seqCnt, lenDis = lenDis, aboveIsoCnt=aboveIsoCnt, last8mer=last8mer)
 
       cname <- colnames(d)
@@ -1024,614 +1498,8 @@ analyseSeqCnt <- function(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer)
       colnames(d) <- cname
 
       return(d)
-  }
-
-########################################################
-########################################################
-# Section: here is the function to use for piRNA normalization
-########################################################
-########################################################
-
-analysisAll <- function(file.suffixPrimary, output.middleName, file.suffixSecondary = NULL, 
-                        normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", 
-                                         "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS",
-                                         "mRNA", "mRNA_AS", "intron", "intron_AS"), 
-                        tailFilter = 0.12, includePrimary = "pre_miRNA_5p3p", includeType = NULL, excludeId = NULL, excludeType = NULL, lenDis = 18:30, aboveIsoCnt = 0, processes = 1, spliceSite = FALSE, last8mer = FALSE, annotWithAS = TRUE, minLength=-1, countColumn=countColumn)
-{
-  seqCnt.all <- list.files(".", paste0(file.suffixPrimary, "$"))
-  
-  if (processes == 1)
-    {
-      miRNA.list <- lapply(seqCnt.all, function(seqCnt.file)
-                           {
-                             show(seqCnt.file)
-                             seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
-                             return(analyseSeqCnt(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer))
-                           })
-    } else {
-      cl <- makeCluster(rep("localhost", (processes-1)),
-                        type = "SOCK"
-                        )
-
-      #export all functions to workers
-      ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv))
-      clusterExport(cl, ex)
-
-      miRNA.list <- parLapply(cl, seqCnt.all, function(seqCnt.file)
-                              {
-                                seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
-                                return(analyseSeqCnt(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer))
-                              })
-      stopCluster(cl)
-    }
-
-  miRNA.list <- Filter(Negate(is.null), miRNA.list)
-  miRNA <- Reduce(function(x,y) merge(x, y, all = TRUE, by = c("chr", "p5", "strand", "gname", "isoSeed")), miRNA.list)
-  for ( i in 1:ncol(miRNA))
-    {
-      if (is.list(miRNA[,i]))
-        {
-          miRNA[,i] <- vapply(miRNA[,i], paste, collapse = ", ", character(1L)) #if one column is a list ...
-        }
-    }
-  
-  if (tailFilter == 1)
-    {
-      if (aboveIsoCnt > 0)
-        {
-          write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf1.ic",aboveIsoCnt,".",countColumn,".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        } else {
-          write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf1.",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        }
-    } else {
-      if (aboveIsoCnt > 0)
-        {
-          write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf", tailFilter, ".ic",aboveIsoCnt, ".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        } else {
-          write.table(miRNA, file = paste0("allProperties.", output.middleName,".tf", tailFilter, ".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        }
-    }
 }
 
-
-##
-analyseSeqCnt.modular <- function(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer, module)
-  {
-    if (is.null(module))
-      {
-        d <- isoform5pAllInOne(seqCnt=seqCnt, lenDis = lenDis, aboveIsoCnt=aboveIsoCnt, last8mer=last8mer)
-      } else {
-        d <- isoform5pAllInOne.modular(seqCnt=seqCnt, lenDis = lenDis, aboveIsoCnt=aboveIsoCnt, last8mer=last8mer, module = module)
-      }
-
-      cname <- colnames(d)
-      sampleID <- seqCnt.file
-      sampleID <- gsub(".*#(\\d+)_.*", "\\1", sampleID,  perl = TRUE)
-      sampleID <- gsub("(\\d+)_.*", "\\1", sampleID,  perl = TRUE)
-      sampleID <- gsub(".trimmed.*", "", sampleID,  perl = TRUE)
-      cname[6:length(d)] <- gsub("$", paste(".", sampleID, sep = ""), cname[6:length(d)], perl = TRUE)
-      colnames(d) <- cname
-
-      return(d)
-  }
-
-analysisAll.modular <- function(file.suffixPrimary, output.middleName, file.suffixSecondary = NULL, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS"), tailFilter = 0.12, includePrimary = "pre_miRNA_5p3p", includeType = NULL, excludeId = NULL, excludeType = NULL, lenDis = 18:30, aboveIsoCnt = 0, processes = 1, spliceSite = FALSE, last8mer = FALSE, annotWithAS=TRUE, module = NULL, minLength=-1, countColumn=countColumn)
-{
-  seqCnt.all <- list.files(".", paste0(file.suffixPrimary, "$"))
-  
-  if (processes == 1)
-    {
-      miRNA.list <- lapply(seqCnt.all, function(seqCnt.file)
-                           {
-                             show(seqCnt.file)
-                             seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
-                             return(analyseSeqCnt.modular(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer, module=module))
-                           })
-    } else {
-      cl <- makeCluster(rep("localhost", (processes-1)),
-                        type = "SOCK"
-                        )
-
-      #export all functions to workers
-      ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv))
-      clusterExport(cl, ex)
-
-      miRNA.list <- parLapply(cl, seqCnt.all, function(seqCnt.file)
-                              {
-                                seqCnt <- getSeqCnt(seqCnt.file=seqCnt.file, file.suffixPrimary=file.suffixPrimary, file.suffixSecondary=file.suffixSecondary, normalizeCnt=normalizeCnt, tailFilter=tailFilter, includePrimary=includePrimary, includeType=includeType, excludeId=excludeId, excludeType=excludeType, spliceSite=spliceSite, annotWithAS=annotWithAS, minLength=minLength, countColumn=countColumn)
-                                return(analyseSeqCnt.modular(seqCnt, seqCnt.file, lenDis, aboveIsoCnt, last8mer, module=module))
-                              })
-      stopCluster(cl)
-    }
-
-  miRNA <- Reduce(function(x,y) merge(x, y, all = TRUE, by = c("chr", "p5", "strand", "gname", "isoSeed")), miRNA.list)
-  for ( i in 1:ncol(miRNA))
-    {
-      if (is.list(miRNA[,i]))
-        {
-          miRNA[,i] <- vapply(miRNA[,i], paste, collapse = ", ", character(1L)) #if one column is a list ...
-        }
-    }
-  
-  if (tailFilter == 1)
-    {
-      if (aboveIsoCnt > 0)
-        {
-          write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf1.ic",aboveIsoCnt,".",countColumn,".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        } else {
-          write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf1.",countColumn,".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        }
-    } else {
-      if (aboveIsoCnt > 0)
-        {
-          write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf", tailFilter, ".ic",aboveIsoCnt,".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        } else {
-          write.table(miRNA, file = paste0("allProperties.", paste(module, collapse="."), ".", output.middleName,".tf", tailFilter, ".",countColumn, ".txt"), sep = "\t", row.names = FALSE, quote = FALSE)
-        }
-    }
-}
-
-###############################
-# the function used in the original pipeline
-# the last step to quantify the read counts and normalized read counts (cpm)
-###############################
-analysisAllmiRNA <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("~/shared/Ameres.GRP/Ivica.Sowemimo/miRNA/head/")
-#R: setwd("~/shared/Ameres.GRP/Ivica.Sowemimo/miRNA/muscle/")
-#R: setwd("~/shared/Ameres.GRP/Ivica.Sowemimo/miRNA/ovary/")
-#R: analysisAllWithinMiRNA(processes = 6)
-
-analysisAllWithinMiRNA <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "WithinMiRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt)
-}
-
-
-#in mirBase the pre_miRNA_5p3p is currently pre_miRNA... & normalizeCnt = TRUE (within miRNA)
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("~/shared/Cochella.GRP/Chiara.Alberti/miRNA_R3289/")
-#R: setwd("~/clustertmp/Chiara.Alberti/")
-#R: analysisAllmiRNABase(processes = 6, aboveIsoCnt = 1)
-#R: setwd("/clustertmp/bioinfo/thomas/Ivica.Sowemimo")
-#R: analysisAllmiRNABase(file.suffix = "tailor.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 1)
-#R: system("mv allProperties.miRNA.tf0.12.ic1.txt allProperties.miRNA.tf0.12.ic1.dm.txt")
-#R: analysisAllmiRNABase(file.suffix = "mm10.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 1)
-#R: system("mv allProperties.miRNA.tf0.12.ic1.txt allProperties.miRNA.tf0.12.ic1.mm.txt")
-#R: analysisAllmiRNABase(file.suffix = "tailor.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 0)
-#R: system("mv allProperties.miRNA.tf0.12.txt allProperties.miRNA.tf0.12.dm.txt")
-#R: analysisAllmiRNABase(file.suffix = "mm10.bam.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 0)
-#R: system("mv allProperties.miRNA.tf0.12.txt allProperties.miRNA.tf0.12.mm.txt")
-#R: analysisAllmiRNABase(file.suffix = "PlusDm3.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 1)
-#R: analysisAllmiRNABase(file.suffix = "PlusDm3.seqCntMirna.txt.gz", processes = 6, aboveIsoCnt = 0)
-analysisAllmiRNABase <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, 
-                                 annotWithAS=TRUE, normalizeCnt = TRUE, aboveIsoCnt = 0)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", includePrimary = "pre_miRNA", 
-              tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt, aboveIsoCnt = aboveIsoCnt)
-}
-
-
-#source("~/development/smallRNA/functions.miRNASummarize.noFixation.R");
-#setwd("/clustertmp/bioinfo/thomas/Chiara.Alberti_R3859")
-#setwd("/clustertmp/bioinfo/thomas/miRNA_R4042")
-#analysisAllmiRNABase.modular(processes = 6, normalizeCnt=FALSE)
-#system("mv allProperties.total.miRNA.tf0.12.count.txt allProperties.total.miRNA.tf0.12.countRaw.txt")
-#analysisAllmiRNABase.modular(processes = 6)
-#analysisAllmiRNABase.modular(processes = 6, normalizeCnt=FALSE, countColumn="UMIfr")
-#system("mv allProperties.total.miRNA.tf0.12.UMIfr.txt allProperties.total.miRNA.tf0.12.UMIfrRaw.txt")
-#analysisAllmiRNABase.modular(processes = 6, countColumn="UMIfr")
-#analysisAllmiRNABase.modular(processes = 6, normalizeCnt=FALSE, countColumn="UMInum")
-#system("mv allProperties.total.miRNA.tf0.12.UMInum.txt allProperties.total.miRNA.tf0.12.UMInumRaw.txt")
-#analysisAllmiRNABase.modular(processes = 6, countColumn="UMInum")
-
-analysisAllmiRNABase.modular <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE, aboveIsoCnt = 0, countColumn = "count")
-{
-  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "miRNA", includePrimary = "pre_miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt, aboveIsoCnt = aboveIsoCnt, countColumn=countColumn, module="total")
-}
-
-
-
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA/")
-analysisAllPreMiRNA <- function(file.suffix="bam.seqCntPreMirna.txt.gz", tailFilter = 0.05, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "premiRNA", includePrimary = c("pre_miRNA"), tailFilter = tailFilter, lenDis = 45:70, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/miRNA/vivo_5.57")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/miRNA/S2_19636_19660_new_r5.57/")
-#R: analysisAllmiRNA.modular(processes=16, tailFilter=0.12, module = c("isoCntLastDiNT"))
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/miRNA/exp5/miRNA_allRep")
-#R: analysisAllmiRNA.modular(processes=16, tailFilter=0.12, module = c("isoCntLTM"), annotWithAS = TRUE)
-#R: analysisAllmiRNA(processes=16, tailFilter=1) #needed for lenDisGM
-#R: analysisAllmiRNA.modular(processes=16, tailFilter=1, module = c("isoCntLTM"), annotWithAS = TRUE)
-#R" setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/miRNA/exp5/miRNA_allRep/monoAT")
-#R: analysisAllmiRNA.modular(processes=16, tailFilter=1, module = c("isoCntMonotail", "isoCntTailLenMonotail"), annotWithAS = TRUE)
-analysisAllmiRNA.modular <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, module = NULL)
-{
-  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, module=module)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Veronika.Herzog/miRNA/ath_R4120/monoAT")
-#R: analysisAllmiRNAWithin.modular(processes=16, tailFilter=1, module = c("isoCntMonotail", "isoCntTailLenMonotail"), annotWithAS = TRUE, includePrimary = c("pre_miRNA"))
-analysisAllmiRNAWithin.modular <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, module = NULL, normalizeCnt = TRUE, includePrimary = c("pre_miRNA_5p3p"))
-{
-  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, module=module, normalizeCnt=normalizeCnt, includePrimary = includePrimary)
-}
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/pre_miRNA/S2_20128ff/")
-#R: analysisAllPreMiRNA.modular(processes=16, tailFilter=0.05, module = c("isoCntLastDiNT"), annotWithAS = FALSE)
-#R: setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA/")
-#R: analysisAllPreMiRNA.modular(processes=16, tailFilter=0.05, module = c("isoCntLTM"), annotWithAS = TRUE)
-#R: analysisAllPreMiRNA(processes=16, tailFilter=1) #needed for lenDisGM
-#R: analysisAllPreMiRNA.modular(processes=16, tailFilter=1, module = c("isoCntLTM"), annotWithAS = TRUE)
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/pre_miRNA/exp5/monoAT/")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/miRNA/exp5/pre_miRNA_mm/monoAT")
-#R: analysisAllPreMiRNA.modular(processes=16, tailFilter=1, module = c("isoCntMonotail", "isoCntTailLenMonotail"), annotWithAS = TRUE)
-
-
-analysisAllPreMiRNA.modular <- function(file.suffix="bam.seqCntPreMirna.txt.gz", tailFilter = 0.05, processes = 1, annotWithAS=TRUE, module=NULL, normalizeCnt = TRUE)
-{
-  analysisAll.modular(file.suffixPrimary = file.suffix, output.middleName = "premiRNA", includePrimary = c("pre_miRNA"), tailFilter = tailFilter, lenDis = 45:70, processes = processes, annotWithAS=annotWithAS, module=module, normalizeCnt = normalizeCnt)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllmiRNAPlusEsi(processes=16)
-#R: analysisAllmiRNAPlusEsi( aboveIsoCnt = 10, processes=16)
-analysisAllmiRNAPlusEsi <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("pre_miRNA_5p3p", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "miRNAPlusEsi", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}
-
-analysisAllGenomePlus <- function(file.suffix = "bam.seqCnt.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = TRUE, aboveIsoCnt = -1)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", includePrimary = "pre_miRNA", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt, aboveIsoCnt = aboveIsoCnt)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllsmallRNA(aboveIsoCnt = 1, processes=6) #ATTENTION: fast out of memory
-#R: analysisAllsmallRNA( aboveIsoCnt = 10, processes=6)
-analysisAllsmallRNA <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", 
-                                includeType = c("pre_miRNA_5p3p", "transposable_element", "transposable_element_AS", 
-                                                "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "smallRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllsmallRNANoMiRNA(aboveIsoCnt = 1, processes=6) #ATTENTION: fast out of memory
-#R: analysisAllsmallRNANoMiRNA( aboveIsoCnt = 10, processes=6)
-analysisAllsmallRNANoMiRNA <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("transposable_element", "transposable_element_AS", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "smallRNA.NoMiRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}
-
-#Raphael.Manzenreither 3' GFP
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither")
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllGFP(processes=6)
-#R: analysisAllGFP(processes=6, includeType=c("virus"))
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/GFP/")
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllGFP(processes=6, includeType=c("pre_miRNA"), construct="GFP")
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/TR4/")
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllGFP(processes=6, includeType=c("pre_miRNA"), construct="TR4")
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/TR57/")
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllGFP(processes=6, includeType=c("pre_miRNA"), construct="TR57")
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/GFP")
-#R: analysisAllGFP(processes=6, includeType=c("pre_miRNA"), construct="GFP")
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/ESI21")
-#R: analysisAllGFP(processes=6, includeType=c("pre_miRNA"), construct="ESI21")
-
-analysisAllGFP <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("gfp"), tailFilter = 0.07, aboveIsoCnt = -1, processes = 1, annotWithAS=FALSE, normalizeCnt = TRUE, construct=NULL)
-{
-    analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "3prime", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt, lenDis = 29:46)
-
-    if (is.null(construct))
-    {
-        construct <- includeType
-    }
-    
-    ap <- read.delim(paste0("allProperties.3prime.tf", tailFilter, ".txt"))
-    ap$strand <- chartr("+-", "-+", ap$strand)
-    cn <- colnames(ap)
-    cn <- gsub("p3", "pTHREE", cn)
-    cn <- gsub("p5", "p3", cn)
-    cn <- gsub("pTHREE", "p5", cn)
-    colnames(ap) <- cn
-    library("Biostrings")
-    gfp <- readDNAStringSet(paste0(construct, ".fa"))
-    siRNA <- apply(ap[,c("chr", "p3", "strand")], 1, function(l)
-    {
-        if (l["strand"] == "+")
-        {
-            start=as.numeric(l["p3"]) - 10
-            end=as.numeric(l["p3"])+10
-            if (start < 1)
-                start <- 1
-            if (end > width(gfp)[names(gfp) == l["chr"]])
-                end <- width(gfp)[names(gfp) == l["chr"]]
-            return(as.character(reverseComplement(subseq(gfp[l["chr"]], start=start, end=end))))
-        } else {
-            start=as.numeric(l["p3"]) - 9
-            end=as.numeric(l["p3"])+11
-            if (start < 1)
-                start <- 1
-            if (end > width(gfp)[names(gfp) == l["chr"]])
-                end <- width(gfp)[names(gfp) == l["chr"]]
-            return(as.character(subseq(gfp[l["chr"]], start=start, end=end)))
-        }
-    })
-    ap <- cbind(siRNA, ap)
-    write.table(ap, file=paste0("allProperties.3prime.tf", tailFilter, ".txt"), quote=FALSE, row.names=FALSE, sep="\t")
-}
-
-
-#Raphael.Manzenreither 3' GFP
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither")
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllGFPmonoT(processes=6)
-#R: analysisAllGFPmonoT(processes=6, includeType=c("virus"))
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Raphael.Manzenreither/constructs_R4592/GFP")
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither/GFP/")
-#R: analysisAllGFPmonoT(processes=6, includeType=c("pre_miRNA"))
-analysisAllGFPmonoT <- function(file.suffixPrimary = "bam.monoT.seqCnt.txt.gz", file.suffixSecondary="bam.monoT.seqCnt.txt.gz", includePrimary="NONE", includeType = c("gfp"), tailFilter = 1, aboveIsoCnt = -1, processes = 1, annotWithAS=FALSE, normalizeCnt = TRUE)
-{
-    analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "3primeMonoT", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt, lenDis = 29:46)
-
-    ap <- read.delim(paste0("allProperties.3primeMonoT.tf", tailFilter, ".txt"))
-    ap$strand <- chartr("+-", "-+", ap$strand)
-    cn <- colnames(ap)
-    cn <- gsub("p3", "pTHREE", cn)
-    cn <- gsub("p5", "p3", cn)
-    cn <- gsub("pTHREE", "p5", cn)
-    colnames(ap) <- cn
-    library("Biostrings")
-    gfp <- readDNAStringSet(paste0(includeType, ".fa"))
-    siRNA <- apply(ap[,c("chr", "p3", "strand")], 1, function(l)
-    {
-        if (l["strand"] == "+")
-        {
-            start=as.numeric(l["p3"]) - 10
-            end=as.numeric(l["p3"])+10
-            if (start < 1)
-                start <- 1
-            if (end > width(gfp)[names(gfp) == l["chr"]])
-                end <- width(gfp)[names(gfp) == l["chr"]]
-            return(as.character(reverseComplement(subseq(gfp[l["chr"]], start=start, end=end))))
-        } else {
-            start=as.numeric(l["p3"]) - 9
-            end=as.numeric(l["p3"])+11
-            if (start < 1)
-                start <- 1
-            if (end > width(gfp)[names(gfp) == l["chr"]])
-                end <- width(gfp)[names(gfp) == l["chr"]]
-            return(as.character(subseq(gfp[l["chr"]], start=start, end=end)))
-        }
-    })
-    ap <- cbind(siRNA, ap)
-    write.table(ap, file=paste0("allProperties.3primeMonoT.tf", tailFilter, ".txt"), quote=FALSE, row.names=FALSE, sep="\t")
-}
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllTransposable(aboveIsoCnt=10, processes=6)
-#R: analysisAllTransposable(aboveIsoCnt=1, processes=6) #ATTENTION: fast out of memory
-analysisAllTransposable <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("transposable_element", "transposable_element_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "transposable", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllcisNAT(processes=16)
-#R: analysisAllcisNAT(aboveIsoCnt=10, processes=16)
-analysisAllcisNAT <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("cisNATs", "cisNATs_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "cisNAT", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllStructured(processes=16)
-#R: analysisAllStructured(aboveIsoCnt=10, processes=16)
-analysisAllStructured <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "structured", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllVirus(processes=2)
-analysisAllVirus <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("virus", "virus_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE, normalizeCnt=FALSE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "viruses", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt)
-}
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("/clustertmp/bioinfo/thomas/CG16940_small")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/CG16940/CG16940_small")
-#R: analysisAllFeat( aboveIsoCnt = 10, processes=2)
-#R: setwd("/clustertmp/bioinfo/thomas/CG16940_large")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/CG16940/CG16940_30plus")
-#R: analysisAllFeat( aboveIsoCnt = 10, tailFilter=0.05, lenDis=26:50, processes=1)
-#R: setwd("/clustertmp/bioinfo/thomas/CG16940_large2")
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/CG16940/CG16940_large40")
-#R: analysisAllFeat( aboveIsoCnt = 10, tailFilter=0.05, lenDis=36:50, processes=1)
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Madalena.Pinto/CG16940/16940_IP_25Aug15/")
-#R: analysisAllFeat( aboveIsoCnt = 10, tailFilter=0.05, lenDis=26:50, processes=1)
-
-analysisAllFeat <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("mapped_reads", "mito", "rRNA", "rRNA_AS", "tRNA", "tRNA_AS", "good_reads", "pre_miRNA_5p3p", "pre_miRNA_5p3p_AS", "pre_miRNA", "pre_miRNA_AS", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "pseudogene", "pseudogene_AS", "ncRNA", "ncRNA_AS", "snoRNA", "snoRNA_AS", "snRNA", "snRNA_AS", "mRNA", "mRNA_AS", "intron", "intron_AS"), tailFilter = 0.12, aboveIsoCnt = 10, processes = 1, annotWithAS=TRUE, normalizeCnt="all", lenDis = 18:30)
-{
-  
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "allFeat", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt=normalizeCnt, lenDis=lenDis)
-}
-
-
-#Pseudo seqCnt file produced with ~/development/scripts/gfp-tailing.pl. Strand "-" not true but it will take 3p as 5p
-#R: setwd("/groups/bioinfo/shared/Ameres.GRP/Stefan.Ameres/GFP-tailing")
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllsiRNAGFP(processes=14)
-analysisAllsiRNAGFP <- function(file.suffix = "seqCnt.txt.gz", includePrimary="siRNA", tailFilter = 0.12, processes = 1, normalizeCnt=TRUE, lenDis = 15:45, annotWithAS=TRUE, minLength = 10)
-{
-    analysisAll(file.suffixPrimary = file.suffix, output.middleName = "siRNA.minLength10", tailFilter = tailFilter, processes = processes, normalizeCnt=normalizeCnt, annotWithAS=annotWithAS, lenDis=lenDis, includePrimary=includePrimary, minLength=minLength)
-}
-
-
-##Raphael.Manzenreither - START
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("/clustertmp/bioinfo/thomas/Raphael.Manzenreither")
-#R: analysisAllmiRNARaphael(processes=18)
-#R: analysisAllesiRNAdsRNARaphael(processes=18)
-#R: analysisAllesiRNARaphael(processes=18)
-#R: analysisAlldsRNARaphael(processes=18)
-
-analysisAllmiRNARaphael <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNA", tailFilter = tailFilter, processes = processes, annotWithAS = annotWithAS, normalizeCnt = normalizeCnt)
-}
-
-analysisAllesiRNAdsRNARaphael <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("structured_loci", "structured_loci_AS", "dsRNA", "dsRNA_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "esiRNA.dsRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
-}
-
-analysisAllesiRNARaphael <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("structured_loci", "structured_loci_AS"), tailFilter = 0.12, aboveIsoCnt = 10, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "esiRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
-}
-
-analysisAlldsRNARaphael <- function(file.suffixPrimary = "bam.seqCnt.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", includePrimary="NONE", includeType = c("dsRNA", "dsRNA_AS"), tailFilter = 0.12, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE, normalizeCnt = c("pre_miRNA_5p3p", "pre_miRNA", "transposable_element", "transposable_element_AS", "__no_feature", "cisNATs", "cisNATs_AS", "structured_loci", "structured_loci_AS", "mRNA", "mRNA_AS", "intron", "intron_AS", "dsRNA", "dsRNA_AS"))
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "dsRNA", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS, normalizeCnt = normalizeCnt)
-}
-
-##Raphael.Manzenreither - END
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllpremiRNAPlusIntron(processes=16)
-#R: analysisAllpremiRNAPlusIntron( aboveIsoCnt = 10, processes=16)
-analysisAllpremiRNAPlusIntron <- function(file.suffixPrimary="bam.seqCntPreMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.05, includePrimary="pre_miRNA_5p3p", includeType = c("intron"), excludeId = NULL, aboveIsoCnt = 0, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "premiRNAPlusIntron", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 45:70, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}              
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllIntronSpliceSite(processes=16) #aboveIsoCnt = -1 to include all
-#R: analysisAllIntronSpliceSite( aboveIsoCnt = 10, processes=16)
-analysisAllIntronSpliceSite <- function(file.suffixPrimary="bam.seqCntPreMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.05, includePrimary="NONE", includeType = c("intron"), excludeId = NULL, aboveIsoCnt = -1, processes = 1, normalizeCnt = "all", spliceSite = TRUE, last8mer = TRUE, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "intronSpliceSite", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 45:70, aboveIsoCnt = aboveIsoCnt, processes = processes, normalizeCnt = normalizeCnt, spliceSite = spliceSite, last8mer = last8mer, annotWithAS=annotWithAS)
-}              
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllConstructEsi2(processes=16) #aboveIsoCnt = -1 to include all
-#R: analysisAllConstructEsi2( aboveIsoCnt = 1, processes=16)
-#R: analysisAllConstructEsi2( aboveIsoCnt = 10, processes=16)
-analysisAllConstructEsi <- function(file.suffixPrimary="bam.seqCntMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.12, includePrimary="construct", includeType = c("ago2_sRNA", "cis_NAT", "endo_siRNA"), excludeId = NULL, aboveIsoCnt = -1, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "constructEsi", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 18:30, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}              
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: analysisAllpremiRNAPlusIntronExcl( aboveIsoCnt = 10, processes=16)
-analysisAllpremiRNAPlusIntronExcl <- function(file.suffixPrimary="bam.seqCntPreMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.05, includePrimary="pre_miRNA_5p3p", includeType = c("intron"), excludeId = NULL, excludeType = c("snoRNA", "tRNA"), aboveIsoCnt = 0, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "premiRNAPlusIntronExcl", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, excludeType = excludeType, lenDis = 45:70, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}              
-
-
-
-#source("~/development/smallRNA/functions.miRNASummarize.R")
-#setwd("~/shared/Ameres.GRP/Madalena.Pinto/miRNA/S2_19636_19660_new/")
-#analysisAllmiRNATest(processes=5)
-analysisAllmiRNATest <- function(file.suffix = "bam.seqCntMirna.txt.gz", tailFilter = 0.12, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "miRNATest", tailFilter = tailFilter, processes = processes, annotWithAS=annotWithAS)
-}
-
-#source("~/development/smallRNA/functions.miRNASummarize.R")
-#setwd("~/shared/Ameres.GRP/Madalena.Pinto/pre_miRNA/S2_20128ff/")
-#analysisAllPreMiRNATest(processes=5)
-analysisAllPreMiRNATest <- function(file.suffix="bam.seqCntPreMirna.txt.gz", tailFilter = 0.05, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffix, output.middleName = "premiRNATest", tailFilter = tailFilter, lenDis = 45:70, processes = processes, annotWithAS=annotWithAS)
-}
-
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("~/shared/Ameres.GRP/Madalena.Pinto/miRNA/S2_19636_19660_new/")#
-#R: analysisAllmiRNAPlusEsiTest(processes=16)
-#R: analysisAllmiRNAPlusEsiTest( aboveIsoCnt = 10, processes=16)
-analysisAllmiRNAPlusEsiTest <- function(file.suffixPrimary="bam.seqCntMirna.txt.gz", file.suffixSecondary="bam.seqCnt.txt.gz", tailFilter = 0.12, includePrimary="pre_miRNA_5p3p", includeType = c("ago2_sRNA", "cis_NAT", "endo_siRNA"), excludeId = NULL, aboveIsoCnt = 0, processes = 1, annotWithAS=TRUE)
-{
-  analysisAll(file.suffixPrimary = file.suffixPrimary, output.middleName = "miRNAPlusEsiTest", file.suffixSecondary = file.suffixSecondary, tailFilter = tailFilter, includePrimary = includePrimary, includeType = includeType, excludeId = excludeId, lenDis = 18:30, aboveIsoCnt = aboveIsoCnt, processes = processes, annotWithAS=annotWithAS)
-}              
-
-
-#setwd("/home/imp/burkard/shared/Ameres.GRP/Madalena.Pinto/pre_miRNA/S2_20128ff/")
-#allPropMean(allReplicates=list(WT=c("20128", "20141", "20142"),
-#                          CG1091=c("20129"),
-#                          CG16940=c("20130"),
-#                          CG1091CG16940=c("20131"),
-#                          Exp5=c("20143"),
-#                          Exp5CG1091=c("20144"),
-#                          Exp5CG16940=c("20145")),
-##                        na.rm = TRUE,
-##                        na.rm = FALSE,
-#                        processes=processes)
-
-#setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA")
-#allPropMean(allReplicates=list(UT=c("30259", "30269", "30279"),
-#              dsGFP=c("30260", "30270", "30280"),
-#              dsTrf4=c("30261", "30271", "30281"),
-#              dsExp5=c("30262", "30272", "30282"),
-#              dsExp5dsTrf4=c("30263", "30273", "30283"),
-#              dsExp5dsGFP=c("30264", "30274", "30284"),
-#              dsMtr4=c("30265", "30275", "30285"),
-#              dsRrp6=c("30266", "30276", "30286"),
-#              dsExp5dsMtr4=c("30267", "30277", "30287"),
-#              dsExp5dsRrp6=c("30268", "30278", "30288")),
-##                        na.rm = TRUE,
-##                        na.rm = FALSE,
-#                        processes=processes)
-            
-
-#setwd("/groups/bioinfo/shared/Ameres.GRP/Raphael.Manzenreither/miRNA/M2196/")
-#allPropMean(allReplicates=list(S2SLuc=c("26141"),
-#                S2SCG1091=c("26142"),
-#                S2STrf4.1=c("26143"),
-#                S2STrf4.2=c("26144"),
-#                S2SCG11418=c("26145"),
-#                S2SMkg=c("26146"),
-#                Hen1KOLuc=c("26147"),
-#                Hen1KOCG1091=c("26148"),                
-#                Hen1KOTrf4.1=c("26149"),
-#                Hen1KOTrf4.2=c("26150"),                
-#                Hen1KOCG11418=c("26151"),
-#                Hen1KO_Mkg=c("26152")),
-#                na.rm = TRUE,
-#                processes=1)
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("~/shared/Ameres.GRP/Madalena.Pinto/miRNA/S2_19636_19660_new/")
-#R: allPropMean()
-#R: allPropMean(na.rm = FALSE)
 allPropMean <- function(allProp.files = NULL, allReplicates=list(UT=c("19636", "19645", "19654"),
                           GFP=c("19637", "19638", "19646", "19647"),
                           CG1091=c("19639", "19648", "19655"),
@@ -1643,7 +1511,7 @@ allPropMean <- function(allProp.files = NULL, allReplicates=list(UT=c("19636", "
                         na.rm = TRUE,
                         processes = 1
                         )
-  {
+{
 
 
     if (is.null(allProp.files))
@@ -1673,10 +1541,10 @@ allPropMean <- function(allProp.files = NULL, allReplicates=list(UT=c("19636", "
             write.table(out, file = sub("allProperties", "allPropertiesMean", f), quote = F, row.names = F, sep = "\t")
           }
       }
-  }
+}
 
 meanTable <- function(allProp, replicate, repName)
-  {
+{
     cn <- gsub(paste0(replicate[1], "$"), "", grep(paste0(".", replicate[1], "$"), colnames(allProp), value = TRUE))
     tmp <- lapply(cn, function(n)
            {
@@ -1707,8 +1575,13 @@ meanTable <- function(allProp, replicate, repName)
 
     return(tmp)
     
-  }
+}
 
+########################################################
+########################################################
+# Section: functions to make plots
+########################################################
+########################################################
 pairs.rnaseq <- function(data, probs = 0.999, main = NULL)
   {
     m <- as.matrix(data)
@@ -1742,7 +1615,7 @@ panel.smooth.rnaseq <- function (x, y, col = par("col"), bg = NA, pch = par("pch
 }
 
 panel.cor.rnaseq <- function(x, y, digits=2, prefix="", cex.cor, rm.max = FALSE, ...)
-  {
+{
 
     if (rm.max)
       {
@@ -1761,80 +1634,80 @@ panel.cor.rnaseq <- function(x, y, digits=2, prefix="", cex.cor, rm.max = FALSE,
     if(missing(cex.cor))
       cex <- 0.8/strwidth(txt)
     text(0.5, 0.5, txt, cex = cex * abs(r))
-  }
+}
 
 
 plotCor <- function(allProp.files = NULL, allReplicates=allReplicates,
                         na.rm = TRUE,
                         processes = 1
                         )
+{
+  
+  if (is.null(allProp.files))
   {
-
-    if (is.null(allProp.files))
-      {
-        allProp.files <- list.files(".", "allProperties\\..*txt$")
-      }
-    
-    for (f in allProp.files)
-      {
-        allProp <- read.delim(f)
-        if (na.rm)
-          {
-            allProp <- allProp[apply(allProp[,grep("align.GM|align.PM", colnames(allProp))], 1, function(l) { all(!is.na(l))}), ]
-          }
-
-        gm <- allProp[,grep("align.GM", colnames(allProp))]
-        pm <- allProp[,grep("align.PM", colnames(allProp))]
-
-
-        pdf(paste0(f, ".cor.pdf"))
-        for (n in names(allReplicates))
-          {
-            pairs.rnaseq(gm[,paste0("align.GM.", allReplicates[[n]])], probs = 1, main = paste(n, "(GM, q = 1, noNA)"))
-            pairs.rnaseq(gm[,paste0("align.GM.", allReplicates[[n]])], probs = 0.95, main = paste(n, "(GM, q = 0.95, noNA)"))
-
-            pairs.rnaseq(pm[,paste0("align.PM.", allReplicates[[n]])], probs = 1, main = paste(n, "(PM, q = 1, noNA)"))
-            pairs.rnaseq(pm[,paste0("align.PM.", allReplicates[[n]])], probs = 0.95, main = paste(n, "(PM, q = 0.95, noNA)"))
-          }
-        dev.off()
-      }
+    allProp.files <- list.files(".", "allProperties\\..*txt$")
   }
+  
+  for (f in allProp.files)
+  {
+    allProp <- read.delim(f)
+    if (na.rm)
+    {
+      allProp <- allProp[apply(allProp[,grep("align.GM|align.PM", colnames(allProp))], 1, function(l) { all(!is.na(l))}), ]
+    }
+    
+    gm <- allProp[,grep("align.GM", colnames(allProp))]
+    pm <- allProp[,grep("align.PM", colnames(allProp))]
+    
+    
+    pdf(paste0(f, ".cor.pdf"))
+    for (n in names(allReplicates))
+    {
+      pairs.rnaseq(gm[,paste0("align.GM.", allReplicates[[n]])], probs = 1, main = paste(n, "(GM, q = 1, noNA)"))
+      pairs.rnaseq(gm[,paste0("align.GM.", allReplicates[[n]])], probs = 0.95, main = paste(n, "(GM, q = 0.95, noNA)"))
+      
+      pairs.rnaseq(pm[,paste0("align.PM.", allReplicates[[n]])], probs = 1, main = paste(n, "(PM, q = 1, noNA)"))
+      pairs.rnaseq(pm[,paste0("align.PM.", allReplicates[[n]])], probs = 0.95, main = paste(n, "(PM, q = 0.95, noNA)"))
+    }
+    dev.off()
+  }
+}
 
 
 tailStatisticsByLengthFrac <- function(file.suffix=".*seqCnt.txt", features = c("tRNA", "pre_miRNA_5p3p"))
+{
+  for (type in features)
   {
-    for (type in features)
+    tailStatistics <- NULL
+    for (f in list.files(".", paste0(file.suffix, "$")))
+    {
+      feat <- read.delim(f)
+      
+      
+      feat.type <- feat[grep(type, as.character(feat$type)), ]
+      cntTotal <- sum(feat.type$count)
+      
+      for (maxFracTail in c(1, 0.3, 0.25, 0.2, 0.17, 0.15, 0.12, 0.1, 0.05))
       {
-        tailStatistics <- NULL
-        for (f in list.files(".", paste0(file.suffix, "$")))
-          {
-            feat <- read.delim(f)
-
-
-            feat.type <- feat[grep(type, as.character(feat$type)), ]
-            cntTotal <- sum(feat.type$count)
-            
-            for (maxFracTail in c(1, 0.3, 0.25, 0.2, 0.17, 0.15, 0.12, 0.1, 0.05))
-              {
-                feat.f <- feat.type[nchar(as.character(feat.type$tail))/nchar(as.character(feat.type$sequence)) <= maxFracTail, ]
-                cntTotal.f <- sum(feat.f$count)
-                
-                feat.tailed <- feat.f[feat.f$tail != "", ]
-                
-                cnt <- sum(feat.tailed$count)
-                fractLoss <- (cntTotal-cntTotal.f)/cntTotal
-                firstA <- sum(feat.tailed[grep("^A", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
-                firstC <- sum(feat.tailed[grep("^C", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
-                firstG <- sum(feat.tailed[grep("^G", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
-                firstT <- sum(feat.tailed[grep("^T", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
-                
-                tailStatistics <- rbind(tailStatistics, c(file=f, type=type, maxTailLength=maxFracTail, fractLoss=fractLoss,cntAll=cntTotal.f, cntTail=cnt, firstA=firstA, firstC=firstC, firstG=firstG, firstT=firstT))
-              }
-          }
-        write.table(tailStatistics, file=paste("tailStatisticsByLengthFrac", type, "txt", sep = "."), row.names = FALSE, sep = "\t", quote = FALSE)
+        feat.f <- feat.type[nchar(as.character(feat.type$tail))/nchar(as.character(feat.type$sequence)) <= maxFracTail, ]
+        cntTotal.f <- sum(feat.f$count)
+        
+        feat.tailed <- feat.f[feat.f$tail != "", ]
+        
+        cnt <- sum(feat.tailed$count)
+        fractLoss <- (cntTotal-cntTotal.f)/cntTotal
+        firstA <- sum(feat.tailed[grep("^A", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
+        firstC <- sum(feat.tailed[grep("^C", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
+        firstG <- sum(feat.tailed[grep("^G", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
+        firstT <- sum(feat.tailed[grep("^T", as.character(feat.tailed$tail), perl = TRUE), "count"])/cnt
+        
+        tailStatistics <- rbind(tailStatistics, c(file=f, type=type, maxTailLength=maxFracTail, fractLoss=fractLoss,cntAll=cntTotal.f, cntTail=cnt, firstA=firstA, firstC=firstC, firstG=firstG, firstT=firstT))
       }
-
+    }
+    write.table(tailStatistics, file=paste("tailStatisticsByLengthFrac", type, "txt", sep = "."), row.names = FALSE, sep = "\t", quote = FALSE)
   }
+  
+}
 
 
 plotLD <- function(allProp)
@@ -1922,58 +1795,53 @@ plotLD <- function(allProp)
   }
 
 plotLenDis <- function(allProp.files, processes = 1)
+{
+  allProp <- NULL
+  for (f in allProp.files)
   {
-    allProp <- NULL
-    for (f in allProp.files)
-      {
-        if (is.null(allProp))
-          {
-            allProp <- read.delim(f)
-          } else {
-            tmp <- read.delim(f)
-            tmp <- merge(allProp, tmp, all = TRUE, by = c("chr", "p5", "strand", "gname", "isoSeed"))
-          }
-      }        
-
-    system("mkdir lenDis")
-    wd <- getwd()
-    setwd(paste(wd, "lenDis", sep = "/"))
-
-
-    if (processes == 1)
-      {
-        apply(allProp, 1, plotLD)
-      } else {
-        cl <- makeCluster(rep("localhost", (processes-1)),
-                          type = "SOCK"
-                          )
-
-        #export all functions to workers
-        ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv))
-        clusterExport(cl, ex)
-        clusterEvalQ(cl, {library("BSgenome.Dmelanogaster.UCSC.dm3")})
-        parApply(cl, allProp, 1, plotLD)
-        stopCluster(cl)
-      }
+    if (is.null(allProp))
+    {
+      allProp <- read.delim(f)
+    } else {
+      tmp <- read.delim(f)
+      tmp <- merge(allProp, tmp, all = TRUE, by = c("chr", "p5", "strand", "gname", "isoSeed"))
+    }
+  }        
+  
+  system("mkdir lenDis")
+  wd <- getwd()
+  setwd(paste(wd, "lenDis", sep = "/"))
+  
+  
+  if (processes == 1)
+  {
+    apply(allProp, 1, plotLD)
+  } else {
+    cl <- makeCluster(rep("localhost", (processes-1)),
+                      type = "SOCK"
+    )
     
-    setwd(wd)
+    #export all functions to workers
+    ex <- Filter(function(x) is.function(get(x, .GlobalEnv)), ls(.GlobalEnv))
+    clusterExport(cl, ex)
+    clusterEvalQ(cl, {library("BSgenome.Dmelanogaster.UCSC.dm3")})
+    parApply(cl, allProp, 1, plotLD)
+    stopCluster(cl)
   }
-
+  
+  setwd(wd)
+}
 
 seqCntLenDis <- function(seqCnt, file.suffix = "bam.seqCnt.txt.gz", seqSeed = "")
-  {
-#    setwd("~/shared/Ameres.GRP/Raphael.Manzenreither/miRNA/gfp-bamH1-luc/")
-#    setwd("~/shared/Ameres.GRP/Madalena.Pinto/miRNA/S2_19636_19660_new/")
-#    setwd("~/shared/Ameres.GRP/Madalena.Pinto/pre_miRNA/S2_20128ff/")
-
+{
     seqCnt.all <- list.files(".", paste0(file.suffix, "$"))
 
     if (seqSeed == "")
-      {
+    {
         pdf("seqCnt.lenDis.pdf", width = 20, height = 10)
-      } else {
+    } else {
         pdf(paste0("seqCnt.lenDis.", seqSeed, ".pdf"), width = 20, height = 10)
-      }
+    }
     
     for (seqCnt.file in seqCnt.all)
       {
@@ -2000,14 +1868,10 @@ seqCntLenDis <- function(seqCnt, file.suffix = "bam.seqCnt.txt.gz", seqSeed = ""
           barplot(sapply(split(s.pm$count, s.pm$len), sum), main = paste("PM", seqCnt.file))
       }
     dev.off()
-  }
-
-#setwd("~/shared/Ameres.GRP/Raphael.Manzenreither/miRNA/gfp-bamH1-luc/")
-#allProp <- read.delim("allProperties.miRNAPlusEsi.tf0.12.ic10.txt")
-#allProp.file <- "allProperties.miRNAPlusEsi.tf0.12.ic10.txt"
+}
 
 guidePassengerPair <- function(allProp.file, l.siRNA = 21, l.3pOverhang = 2) #21nt - 2nt 3' overhang (total sequence covered 23nt)
-  {
+{
 
     seq.GBL <- "GGCCACAAGTTCAGCGTGTCCGGCGAGGGCGAGGGCGATGCCACCTACGGCAAGCTGACCCTGAAGTTCATCTGCACCACCGGCAAGCTGCCCGTGCCCTGGCCCACCCTCGTGACCACCCTGACCTACGGCGTGCAGTGCTTCAGCCGCTACCCCGACCACATGAAGCAGCACGACTTCTTCAAGTCCGCCATGCCCGAAGGCTACGTCCAGGAGCGCACCATCTTCTTCAAGGACGACGGCAACTACAggatccTCATCCCTGATCTGATCGGAATGGGTAAGTCCGGCAAGAGCGGGAATGGCTCATATCGCCTCCTGGATCACTACAAGTACCTCACCGCTTGGTTCGAGCTGCTGAACCTTCCAAAGAAAATCATCTTTGTGGGCCACGACTGGGGGGCTTGTCTGGCCTTTCACTACTCCTACGAGCACCAAGACAAGATCAAGGCCATCGTCCATGCTGAGAGTGTCGTGGACGTGATCGAGTCCTGGGACGAGTGGCC"
     
@@ -2143,108 +2007,98 @@ guidePassengerPair <- function(allProp.file, l.siRNA = 21, l.3pOverhang = 2) #21
     plot(allProp.gp$p5.x, allProp.gp$align.GM.21464.x, type = "l", ylim = c(-27000, 27000))
     lines(allProp.gp$p5.x, -allProp.gp$align.GM.21464.y)
 
-    
+}
 
-
-
-    
-#    plot(allProp.heat[,"align.GM.21461.x"], allProp.heat[,"align.GM.21461.y"])
-  }
-
-#R: source("~/development/smallRNA/functions.miRNASummarize.R")
-#R: setwd("~/shared/Ameres.GRP/Madalena.Pinto/pre_miRNA/exp5/")
-#R: plotBalloon()
 plotBalloon <- function()
-  {
-    library(ggplot2)
-
-#setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA/")
-files <- list.files(pattern="isoCntLTM.*txt$")
-for (f in files)
+{
+  library(ggplot2)
+  
+  #setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA/")
+  files <- list.files(pattern="isoCntLTM.*txt$")
+  for (f in files)
   {
     allProp.modular <- read.delim(f)
     allProp <- read.delim(sub("isoCntLTM.", "", f))
     allProp <- merge(allProp, allProp.modular, by = c("chr", "p5", "strand", "gname", "isoSeed"))
-
+    
     for (inclGM in c(TRUE, FALSE))
+    {
+      if (inclGM)
       {
-        if (inclGM)
-          {
-            pdf(sub(".txt$", ".balloon.pdf", f), height = 15, width = 10)
-          } else {
-            pdf(sub(".txt$", ".balloonPM.pdf", f), height = 15, width = 10)
-          }
-        
-        apply(allProp, 1, function(ltm)
-              {
-#ltm <- as.character(t(allProp)[,1])
-#names(ltm) <- colnames(allProp)
-                gname <- ltm["gname"]
-
-                if (as.character(ltm["strand"]) == "+")
-                  {
-                    #p5 is 0-based for + strand (=start of BED region)
-                    sequence <-getSeq(Dmelanogaster,
-                                      name=paste("chr", as.character(ltm["chr"]), sep = ""),
-                                      start=(as.num(ltm["p5"])+1),
-                                      strand="+",
-                                      width=100)
-                  } else {
-                    #p5 is 1-based for - strand (=end of BED region)
-                    sequence <-getSeq(Dmelanogaster,
-                                      name=paste("chr", as.character(ltm["chr"]), sep = ""),
-                                      end=(as.num(ltm["p5"])),
-                                      strand="-",
-                                      width=100)
-                  }
-                sequence <- unlist(strsplit(as.character(sequence), split=""))
-
-                
-                if (inclGM)
-                  {
-                    names(ltm) <- sub("lenDisGM\\.(\\d+)", "LTM.GM_\\1_0", names(ltm), perl = TRUE)
-                  }
-                names(ltm) <- sub("\\.mean\\.", ".", names(ltm), perl = TRUE)
-            
-                ltm <- ltm[grep("LTM", names(ltm))]
-                ltm <- ltm[grep("\\.sd\\.", names(ltm), invert=TRUE, perl = TRUE)]
-                ltm[is.na(ltm)] <- 0
-
-                ltm <- cbind(do.call(rbind, strsplit(sub("LTM.(.*?)\\.(.*)", "\\1_\\2", names(ltm), perl = TRUE), "_")), ltm)
-
-                colnames(ltm) <- c("monotail", "alignLength", "taillength", "condition", "RPM")
-#        ltm <- ltm[as.numeric(as.character(ltm[,"ltm"])) > 0, ]
-                if (any(as.numeric(as.character(ltm[,"RPM"])) > 0)) {
-                  ltm <- as.data.frame(ltm)
-                  ltm[,"RPM"] <- as.numeric(as.character(ltm[,"RPM"]))
-              
-                  p <- ggplot(ltm, aes(x=alignLength, y=taillength, weight=RPM, colour=monotail, size=RPM)) +
-                    geom_point( alpha=0.8, guide="none") +
-                      facet_grid(condition ~ .) +
-                        scale_colour_brewer(palette="Set1", type="qual", name="Monotail") +
-                          guides(colour = guide_legend(override.aes = list(alpha = 1))) +
-                            ggtitle(gname) + 
-                              scale_size_area(max_size = 6) +
-                                theme_bw() +
-                                  scale_x_discrete( labels=sequence[min(as.num(ltm[,"alignLength"])):max(as.num(ltm[,"alignLength"]))])
-                  
-                  show(p)
-                  return(0)
-                } else {
-                  return(1)
-                }
-              })
-        dev.off()
+        pdf(sub(".txt$", ".balloon.pdf", f), height = 15, width = 10)
+      } else {
+        pdf(sub(".txt$", ".balloonPM.pdf", f), height = 15, width = 10)
       }
+      
+      apply(allProp, 1, function(ltm)
+      {
+        #ltm <- as.character(t(allProp)[,1])
+        #names(ltm) <- colnames(allProp)
+        gname <- ltm["gname"]
+        
+        if (as.character(ltm["strand"]) == "+")
+        {
+          #p5 is 0-based for + strand (=start of BED region)
+          sequence <-getSeq(Dmelanogaster,
+                            name=paste("chr", as.character(ltm["chr"]), sep = ""),
+                            start=(as.num(ltm["p5"])+1),
+                            strand="+",
+                            width=100)
+        } else {
+          #p5 is 1-based for - strand (=end of BED region)
+          sequence <-getSeq(Dmelanogaster,
+                            name=paste("chr", as.character(ltm["chr"]), sep = ""),
+                            end=(as.num(ltm["p5"])),
+                            strand="-",
+                            width=100)
+        }
+        sequence <- unlist(strsplit(as.character(sequence), split=""))
+        
+        
+        if (inclGM)
+        {
+          names(ltm) <- sub("lenDisGM\\.(\\d+)", "LTM.GM_\\1_0", names(ltm), perl = TRUE)
+        }
+        names(ltm) <- sub("\\.mean\\.", ".", names(ltm), perl = TRUE)
+        
+        ltm <- ltm[grep("LTM", names(ltm))]
+        ltm <- ltm[grep("\\.sd\\.", names(ltm), invert=TRUE, perl = TRUE)]
+        ltm[is.na(ltm)] <- 0
+        
+        ltm <- cbind(do.call(rbind, strsplit(sub("LTM.(.*?)\\.(.*)", "\\1_\\2", names(ltm), perl = TRUE), "_")), ltm)
+        
+        colnames(ltm) <- c("monotail", "alignLength", "taillength", "condition", "RPM")
+        #        ltm <- ltm[as.numeric(as.character(ltm[,"ltm"])) > 0, ]
+        if (any(as.numeric(as.character(ltm[,"RPM"])) > 0)) {
+          ltm <- as.data.frame(ltm)
+          ltm[,"RPM"] <- as.numeric(as.character(ltm[,"RPM"]))
+          
+          p <- ggplot(ltm, aes(x=alignLength, y=taillength, weight=RPM, colour=monotail, size=RPM)) +
+            geom_point( alpha=0.8, guide="none") +
+            facet_grid(condition ~ .) +
+            scale_colour_brewer(palette="Set1", type="qual", name="Monotail") +
+            guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+            ggtitle(gname) + 
+            scale_size_area(max_size = 6) +
+            theme_bw() +
+            scale_x_discrete( labels=sequence[min(as.num(ltm[,"alignLength"])):max(as.num(ltm[,"alignLength"]))])
+          
+          show(p)
+          return(0)
+        } else {
+          return(1)
+        }
+      })
+      dev.off()
+    }
   }
 }
 
 plotTypePie <- function(pdf=TRUE)
-  {
+{
     library(ggplot2)
     library(reshape2)
     library(RColorBrewer)
-#setwd("/clustertmp/bioinfo/thomas/Exp5_preMiRNA/")
 
     type <- read.delim("cnt.typeHierarchy.txt")
     type[is.na(type)] <- 0
@@ -2289,4 +2143,4 @@ plotTypePie <- function(pdf=TRUE)
         show(vis1)
         show(vis2)
     }
-  }
+}
