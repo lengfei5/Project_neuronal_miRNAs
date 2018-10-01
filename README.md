@@ -27,7 +27,12 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
     
   - [ ] Improve the piRNA normalization by using individual piRNA read count
-  
+    - To count the reads for miRNA (and piRNAs), there are just one R function to do it in Thomas' pipleline.  
+      - functions.miRNASummarize.R (most comprehensive counting, considering different 5' or isoforms, count only the most abundance 5' or isoform and ignore 
+        others )
+      - functions.miRNASummarize.no.fixation.R (pool different 5' or isoforms) 
+      - total different R function in nextflow pipeline (suppose to give same results as functions.miRNASummarize.no.fixation.R)
+      
   - [ ] Integrate the sample qualities into the linear model
   
   - [ ] Optimize the fitting and parameter to have final results
