@@ -336,7 +336,7 @@ if(Save.Processed.Tables)
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   
   write.table(xx, 
-              file = paste0(resDir, "/Expression_Matrix_piRNA_normalization_average_replicates_remove_batch_allgenes_N2_background_12samples.txt"), 
+              file = paste0(resDir, "/Expression_Matrix_piRNA_normalization_average_replicates_remove_batch_allgenes_N2_background_all_samples.txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   
 }

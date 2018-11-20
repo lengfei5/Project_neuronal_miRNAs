@@ -65,7 +65,12 @@ This reprosition is for the deconvolution analysis for Chiara's project
     and meanwhile scale the expression into the range (0, 1)
     
 
-## update
+## Update
+  - 20181120:
+    - R7011 for the new pan-neuron smaples is done, in which the pan-neuron with rab-3 promoter and with another promoter rgef-1
+    
+    
+    
   - 20180822: 
     new rab-3 in WT background with spike-in cames; to integrate the new data into the existing analysis, I just need to run the
     `miRNA_enrichmentAnalysis_for_neuronClass.R` which compares the WT and henn1-mutant and also enrichment analysis for both background;
