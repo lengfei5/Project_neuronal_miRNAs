@@ -169,7 +169,7 @@ panel.cor <- function(x, y, digits=2, prefix="", cex.cor)
   text(.8, .8, Signif, cex=cex, col=2) 
 }
 
-panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 1.0, col='black') 
+panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 0.5, col='black') 
 {
   #x = yy[,1];y=yy[,2];
   #kk = which(x>0 & y>0); x=x[kk];y=y[kk]

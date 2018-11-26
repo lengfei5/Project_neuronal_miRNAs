@@ -12,9 +12,11 @@ statDir = "../data/normalized_piRNAs"
 version.table = "miRNAs_neurons_v1_2018_03_07"
 
 resDir = "../results/tables_for_decomvolution"
+tabDir = paste0(resDir, "/tables/")
 if(!dir.exists(resDir)) dir.create(resDir)
+if(!dir.exists(tabDir)) dir.create(tabDir)
 Save.Processed.Tables = TRUE
-version.analysis = "neuronal_miRNAs_20180911"
+version.analysis = "neuronal_miRNAs_20181120"
 
 ######################################
 ######################################
@@ -151,7 +153,7 @@ if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
   load(file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
   
   pdfname = paste0(resDir, "/Compare_piRNAs_siRNAs_spikeIns_for_scalingFactorinNormalization", version.analysis,  ".pdf")
-  pdf(pdfname, width=12, height = 10)
+  pdf(pdfname, width=20, height = 14)
   par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   # common quality control normalized by DESeq2 
@@ -189,14 +191,23 @@ load(file = paste0(RdataDir, 'piRAN_siRNA_stats_counTables_cpm.piRNA_', version.
 
 Use.ComBat.for.batch.correction = TRUE
 ## to test if one rab-3 replicates should be removed
-Remove.pan.neurons.samples.71822.71823 = FALSE
-
+Remove.pan.neurons.samples.71822.71823.as.outliers = TRUE
 
 ###############################
 # choose the method of batch correction 
 ###############################
 source("miRNAseq_functions.R")
-design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(15,2), rep(16, 2), rep(17, 4))
+design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(17, 4), rep(15, 2), rep(16, 2), rep(18, 8))
+
+
+if(Remove.pan.neurons.samples.71822.71823.as.outliers)
+{
+  kk = match(c(71822:71823), design.matrix$SampleID)
+  #cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, -kk])
+  design.matrix = design.matrix[-kk, ]
+  cpm.piRNA = cpm.piRNA[, -kk]
+}
+
 #method.sel = 'linear.model'
 ## remove batch effect by scaling the untreated samples using N2 as the reference
 cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'linear.model')
@@ -218,17 +229,15 @@ par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
 jj = grep("WT_Pan.neurons_untreated_", colnames(cpm.piRNA.bc))
 kk = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
-jj1 = grep("N2_whole.body_untreated", colnames(cpm.piRNA.bc))
-kk1 = grep("N2_whole.body_treated", colnames(cpm.piRNA.bc))
-par(mfrow=c(2, 2))
-plot(cpm.piRNA.bc[,jj], log='xy', cex=1.0); abline(0, 1, col='red', lwd=2.0)
-plot(cpm.piRNA.bc[,kk], log='xy', cex=1.0); abline(0, 1, col='red', lwd=2.0)
 
-plot(cpm.piRNA.bc[, jj1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
-plot(cpm.piRNA.bc[, kk1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
+par(mfrow=c(1, 1))
+plot.pair.comparison.plot(cpm.piRNA.bc[, jj], main = paste0("untreate pan-neurons" ,"-- pairwise comparison for piRNA-normalization"))
+plot.pair.comparison.plot(cpm.piRNA.bc[, kk], main = paste0("treate pan-neurons" ,"-- pairwise comparison for piRNA-normalization"))
+
+#plot(cpm.piRNA.bc[, jj1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
+#plot(cpm.piRNA.bc[, kk1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
 
 dev.off()
-
 
 pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval_",  version.analysis, ".pdf")
 pdf(pdfname, width=20, height = 8)
@@ -238,8 +247,8 @@ par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 source("miRNAseq_functions.R")
 
 Test.piRNA.normalization.batch.removal(cpm.piRNA, design.matrix)
-Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
-Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.limma, design.matrix)
+#Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
+#Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.limma, design.matrix)
 Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.combat, design.matrix)
 
 dev.off()
@@ -250,14 +259,8 @@ dev.off()
 ## average the biological replicates
 source("miRNAseq_functions.R")
 
-if(Remove.pan.neurons.samples.71822.71823)
-{
-  kk = match(c(71822:71823), design.matrix$SampleID)
-  cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, -kk])
-}else{
-  cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
-  cpm.piRNA.bc.meanrep.log2 = average.biological.replicates(log2(cpm.piRNA.bc))
-}
+cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+cpm.piRNA.bc.meanrep.log2 = average.biological.replicates(log2(cpm.piRNA.bc))
 
 mm = match(c("lsy-6", "mir-791", "mir-790"), rownames(cpm.piRNA.bc))
 
@@ -295,7 +298,7 @@ for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
 #expression = cpm.piRNA.bc.meanrep[, setdiff(kk, index.N2)] - cpm.piRNA.bc.meanrep[, index.N2]   
 #expression[which(expression<0)] = 0
 
-enriched.list = read.table(file = paste0(resDir, "/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
+enriched.list = read.table(file = paste0(resDir, "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
                            sep = "\t", header = TRUE, row.names = 1)
 enriched.list = colnames(enriched.list)
 enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
@@ -329,18 +332,19 @@ dev.off()
 
 if(Save.Processed.Tables)
 {
-  write.table(expression.sel, file = paste0(resDir, "/Expression_Matrix_select_12samples_66genes_with_clusters_for_neuronClasses.txt"), 
-              sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
+  #write.table(expression.sel, file = paste0(tabDir, "Expression_Matrix_select_14samples_66genes_", version.analysis, ".txt"), 
+  #            sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   
-  write.table(expression, file = paste0(resDir, "/Expression_Matrix_select_12samples_allgenes_with_clusters_for_neuronClasses.txt"), 
-              sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
+  #write.table(expression, file = paste0(tabDir, "Expression_Matrix_select_14samples_allgenes_",  version.analysis, ".txt"), 
+  #            sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   
   write.table(xx, 
-              file = paste0(resDir, "/Expression_Matrix_piRNA_normalization_average_replicates_remove_batch_allgenes_N2_background_all_samples.txt"), 
+              file = paste0(tabDir, "Expression_Matrix_piRNA_normalization_average_replicates_remove_batch_allgenes_N2_background_all_samples_", 
+              version.analysis, 
+              ".txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   
 }
-
 
 ######################################
 ######################################

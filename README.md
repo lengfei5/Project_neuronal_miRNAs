@@ -37,6 +37,15 @@ This reprosition is for the deconvolution analysis for Chiara's project
   
   - [ ] Optimize the fitting and parameter to have final results
 
+### code structure
+- `miRNA_enrichAnalysis_for_neuronClassess.R`
+  the first code to run after raw data processing. It prepare the count table and design matrix for all samples
+  Then it runs the enrichment analysis for each tissue and promoter (as in the Nature Methods paper)
+- `prepare_ExpressionMatrix.R`
+  normalize the miRNA expression with piRNA or test spike-in 
+  prepare the expression matrix for deconvolution analysis
+
+
 ### Deconvolution analysis
 `deconvolution_analysis.R`
 

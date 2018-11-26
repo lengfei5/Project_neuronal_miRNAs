@@ -164,7 +164,7 @@ Check.data.quality = TRUE
 #for(n in 1:length(tcs))
 for(n in c(17))
 {
-  # n = 17
+  # n = 1
   specifity = tcs[n];
 
   specDir = paste0(resDir, "/", specifity, "/")

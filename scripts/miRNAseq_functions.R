@@ -785,7 +785,6 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
     ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
     kk = which(rownames(cpm)==gg)
     
-    
     for(m in c(1:3)){
       if(m == 1) {log = 'y'; lims = range(cpm[kk,]);}
       if(m == 2) {log = ''; lims = range(cpm[kk,]);}
@@ -800,10 +799,17 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
       {
         index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")
         points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='darkblue', cex=1.5, pch =16)
+        # add sample ids 
+        if(ns[n]=="Pan.neurons"){
+          text(rep(n, length(index.ns)), cpm[kk, index.ns], design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
+        }
+        
         index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
         points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1.5, pch = 0)
+        
+        
+        
       }
-      
       #legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
       axis(2, las= 1)
       ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
@@ -812,8 +818,6 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
       box()
       
     }
-    
-    
   }
   
 }
@@ -995,9 +999,17 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
   # compare spike-in normalization and piRNA-normalization 
   ###############################
   if(compareSpikeIn){
-    spikes = read.delim(paste0("../data/normalized_piRNAs/R6585_spikeIns_count_table.txt"), sep="\t", header = TRUE, row.names = 1)
+    spike.files = list.files(path = "../data/normalized_piRNAs", pattern = "spikeIns_count_table.txt", full.names = TRUE)
+    spikes = NULL;
+    for(j in 1:length(spike.files)){
+      if(j == 1){
+        spikes = read.delim(spike.files[j], sep="\t", header = TRUE, row.names = 1)
+      }else{
+        spikes = rbind(spikes, read.delim(spike.files[j], sep="\t", header = TRUE, row.names = 1))
+      }
+    }
     spikes = t(as.matrix(spikes))
-    spikes = data.frame(gene=rownames(spikes), spikes, stringsAsFactors = FALSE)
+    spikes = data.frame(gene=rownames(spikes), spikes, stringsAsFactors = FALSE) 
     
     index.samples.with.spikeIns = which(design$tissue.cell=="Pan.neurons" & design$genotype=="WT")
     spikes = process.countTable(all=spikes, design = design[index.samples.with.spikeIns, ], select.Total.count = FALSE)
@@ -1017,13 +1029,13 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     
     ## calculate scaling factor using spike-ins
     #source("miRNAseq_functions.R")
-    par(mfrow=c(2,4))
+    par(mfrow=c(2,2))
     res.spike.in = calculate.scaling.factors.using.spikeIns(rab3, concentrations = concentrations, 
                                                             index.spikeIn = index.spikeIn, read.threshold = 10)
     cpm = res.spike.in$cpm;
     res = res.spike.in$normalization.spikeIn
     colnames(cpm) = paste0(colnames(cpm), ".cpm")
-    colnames(res) = paste0(colnames(res), ".amol.per.mugRNA.normBySpikeIns")
+    colnames(res) = paste0(colnames(res), ".normSpike")
     
     ## double check total number of reads with and without spike-ins
     par(mfrow=c(2,2))
@@ -1049,24 +1061,25 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     #sf.s = sf.s/sf.s[1]
     
     par(mfrow=c(1,1))
-    plot(sf.s, sf.p, log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=2.0,
-         xlim = c(1, 150), ylim = c(0.01, 50), xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
+    plot(sf.s, sf.p, log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=2.0, xlim = c(4, 400), ylim = c(0.2, 100),
+          xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
     #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
-    text(sf.s, sf.p, labels = colnames(rab3), offset = 0.5, pos = 1)
+    text(sf.s, sf.p, labels = colnames(rab3), offset = 0.5, pos = 1, cex = 0.7)
     
     # compare the cpm, spike-in normalization and piRNA normalization
     par(mfrow=c(1,1))
     source("RNAseq_Quality_Controls.R")
-    plot.pair.comparison.plot(cpm, main = "rab-3 WT pairwise comparison for cpm ")
-    my.plotPCA(cpm, design.matrix = design.matrix.rab3)
-    plot.pair.comparison.plot(res, main = "rab-3 pairwise comparison for spike-in normalization")
-    my.plotPCA(res, design.matrix = design.matrix.rab3)
+    o1 = order(design.matrix.rab3$treatment, design.matrix.rab3$promoter);
+    plot.pair.comparison.plot(cpm[, o1], main = "rab-3 WT pairwise comparison for cpm ")
+    #my.plotPCA(cpm, design.matrix = design.matrix.rab3)
+    plot.pair.comparison.plot(res[, o1], main = "rab-3 pairwise comparison for spike-in normalization")
+    #my.plotPCA(res, design.matrix = design.matrix.rab3)
     
     sizefactors = as.numeric(stats.rab3$piRNA)
     cpm.piRNA = rab3;
     for(n in 1:ncol(cpm.piRNA)) cpm.piRNA[,n] = cpm.piRNA[,n]/sizefactors[n]*10^6
     
-    plot.pair.comparison.plot(cpm.piRNA, main = "rab-3 pairwise comparison for piRNA-normalization")
+    plot.pair.comparison.plot(cpm.piRNA[, o1], main = "rab-3 pairwise comparison for piRNA-normalization")
     
   }
   
@@ -1094,15 +1107,19 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
   ###############################
   # compare the rab-3 untreated with other untreated samples
   ###############################
-  kk = grep("untreated_", colnames(cpm.piRNA))
-  par(mfrow=c(3,2))
-  for(n in kk){
-    if(n != 55 & n != 57){
-      plot(cpm.piRNA[, c(n, 55)], log='xy'); abline(0, 1, lwd=2.0, col='red')
-      plot(cpm.piRNA[, c(n, 57)], log='xy'); abline(0, 1, lwd=2.0, col='red')
+  Compare.rab3.vs.other.untreated = FALSE
+  if(Compare.rab3.vs.other.untreated){
+    kk = grep("untreated_", colnames(cpm.piRNA))
+    par(mfrow=c(3,2))
+    for(n in kk){
+      if(n != 55 & n != 57){
+        plot(cpm.piRNA[, c(n, 55)], log='xy'); abline(0, 1, lwd=2.0, col='red')
+        plot(cpm.piRNA[, c(n, 57)], log='xy'); abline(0, 1, lwd=2.0, col='red')
+      }
+      
     }
-   
   }
+  
 }
 
 my.plotPCA = function(xx, design.matrix){
