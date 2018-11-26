@@ -26,14 +26,14 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - [x] By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
     - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
     
-  - [ ] Improve the piRNA normalization by using individual piRNA read count
+  - [ ] Improve the piRNA normalization by using individual piRNA read count ??
     - To count the reads for miRNA (and piRNAs), there are just one R function to do it in Thomas' pipleline.  
       - functions.miRNASummarize.R (most comprehensive counting, considering different 5' or isoforms, count only the most abundance 5' or isoform and ignore 
         others )
       - functions.miRNASummarize.no.fixation.R (pool different 5' or isoforms) 
       - total different R function in nextflow pipeline (suppose to give same results as functions.miRNASummarize.no.fixation.R)
       
-  - [ ] Integrate the sample qualities into the linear model
+  - [ ] Integrate the sample qualities into the linear model ??
   
   - [ ] Optimize the fitting and parameter to have final results
 

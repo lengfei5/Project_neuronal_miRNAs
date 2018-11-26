@@ -15,10 +15,10 @@ source('miRNAseq_functions.R')
 Data.complete = TRUE
 fitting.space = "log2" ## linear or log2 transformed for expression matrix
 
+Use.mergedFractionMatrix = TRUE
+Use.coarse.neuronClass.FractionMatrix = FALSE
 
 add.background.sample.in.fitting.linear.space = TRUE
-Use.mergedFractionMatrix = FALSE
-Use.coarse.neuronClass.FractionMatrix = TRUE
 
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
 
@@ -30,7 +30,7 @@ version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
 
-version.analysis = "_20180928"
+version.analysis = "_20181126"
 
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 resDir = "../results/decomvolution_results/"
@@ -155,7 +155,7 @@ if(Manually.unifiy.sample.names.forMatrix){
   expression = t(expression)
   rownames(expression) = c( "background", "ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
                             "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42", 
-                            "Pan.neurons", "unc.3")
+                            "unc.3", "Pan.neurons")
   
   ###############################
   # if fitting in linear scale, then the background sample is used and the background is added in proportion matrix as well
@@ -234,7 +234,8 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
   pdf(pdfname, width=15, height = 6)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
-  Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.sel, fitting.space = "log2")
+  Plot.ProprotionMatrix.ExpressionMatrix(proportions.sel, expression.sel, fitting.space = "log2")
+    
   dev.off()
 }
 
@@ -253,8 +254,8 @@ y[y<0] = 0
 if(!Use.coarse.neuronClass.FractionMatrix){
   
   x = x >0
-  #Example2test = c("lsy-6", "mir-791", "mir-790", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
-  Example2test = c("lsy-6", "mir-791", "mir-793")
+  Example2test = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
+  #Example2test = c("lsy-6", "mir-791", "mir-793")
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
   
@@ -297,17 +298,18 @@ save.optimal.results.for.downstream.analysis = TRUE
 #Methods2test = c("cv.lambda.1se", "bic", "aic", "aicc")
 Methods2test = c("cv.lambda.1se")
 
-alphas = c(seq(0.2, 1, by= 0.2))
+alphas = c(seq(0.4, 1, by= 0.05))
 #alphas = c(0.1)
-lambda = 10^seq(-3, 3, length.out = 1000)
+lambda = 10^seq(-3, 3, length.out = 500)
 nlambda = 400;
 
+# make a folder for the result
+if(TEST.glmnet.gene.specific.alpha) {testDir = paste0(resDir, "deconvolution_results/glmnet_tuning_gene_specific_alpha", version.analysis);
+}else{testDir = paste0(resDir, "deconvolution_results/glmnet_tuning_global_alpha", version.analysis); }
+
+if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
+
 source("select_tuningParams_elasticNet.R")
-
-if(TEST.glmnet.gene.specific.alpha) {testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_gene_specific_alpha");
-}else{testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_global_alpha_plots4recess"); }
-if(!dir.exists(testDir)) dir.create(testDir)
-
 for(method in Methods2test)
 {
   pdfname = paste0(testDir, "/deconv_test", version.analysis, 
@@ -319,7 +321,7 @@ for(method in Methods2test)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, nlambda = nlambda, lambda = lambda,
+  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7,
                                       Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
   dev.off()

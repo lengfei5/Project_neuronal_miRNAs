@@ -43,7 +43,7 @@ version.analysis = paste0(version.Data, "_2018_03_07")
 ### Directories to save results
 design.file = "../exp_design/Neuron_project_design_all_v1.xlsx"
 dataDir = "../data"
-resDir = paste0("../results/", version.analysis)
+resDir = paste0("../results/miRNAs_neurons_enrichment")
 tabDir =  paste0(resDir, "/tables/")
 RdataDir = paste0(resDir, "/Rdata/")
 if(!dir.exists(resDir)){dir.create(resDir)}
@@ -166,8 +166,8 @@ for(n in c(17))
 {
   # n = 1
   specifity = tcs[n];
-
-  specDir = paste0(resDir, "/", specifity, "/")
+  
+  specDir = paste0(tabDir, specifity, "/")
   if(!dir.exists(specDir)){dir.create(specDir)}
   
   kk = which(design$tissue.cell==specifity)
@@ -352,10 +352,21 @@ for(n in c(17))
   dev.off();
   
 }
+  
+###############################
+# log session info
+###############################
+sessionDir = paste0(resDir, "/log/")
+if(!dir.exists(sessionDir)){dir.create(sessionDir)}
+
+sink(paste(sessionDir,"sessionInfo.Chiara.miRNA.DESeq2", version.analysis, ".txt", sep=""))
+sessionInfo()
+sink()
+save.image(file=paste0(sessionDir,"Chiara_miRNAs_DESeq2", version.analysis, ".RData"))
 
 ########################################################
 ########################################################
-# Section: some additional plots or test
+# Section: other additional plots or test
 ########################################################
 ########################################################
 Plot.for.presentation = FALSE
@@ -400,7 +411,7 @@ if(Compare.rab3_wt_vs_henn1.mutant){
   
   kk = intersect(grep("DESeq2", colnames(yy)), grep("N2", colnames(yy)))
   fc.N2 = log2(apply(yy[, kk[grep("_treated_", colnames(yy)[kk])]], 1, mean)/
-                apply(yy[, kk[grep("_untreated_", colnames(yy)[kk])]], 1, mean))
+                 apply(yy[, kk[grep("_untreated_", colnames(yy)[kk])]], 1, mean))
   
   kk = intersect(grep("DESeq2", colnames(yy)), grep("WT", colnames(yy)))
   fc.wt = log2(apply(yy[, kk[grep("_treated_", colnames(yy)[kk])]], 1, mean)/
@@ -428,17 +439,4 @@ if(Compare.rab3_wt_vs_henn1.mutant){
   abline(0, 1, lwd=2.0, col='red')
   #text( xx$log2FoldChange, fc.wt, rownames(xx), offset = 0.7, cex = 0.5)
   
-  
-  
 }
-  
-###############################
-# log session info
-###############################
-sessionDir = paste0(resDir, "/log/")
-if(!dir.exists(sessionDir)){dir.create(sessionDir)}
-
-sink(paste(sessionDir,"sessionInfo.Chiara.miRNA.DESeq2.txt", sep=""))
-sessionInfo()
-sink()
-save.image(file=paste0(sessionDir,"Chiara_miRNAs_DESeq2.RData"))

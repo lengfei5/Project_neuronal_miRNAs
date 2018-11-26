@@ -23,7 +23,7 @@ version.analysis = "neuronal_miRNAs_20181120"
 ## Section: load count tables for miRNAs and prepare statistics for piRNA and siRNAs for normalization
 ######################################
 ######################################
-load(file = paste0('../results/miRNAs_neurons_v1_2018_03_07/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
+load(file = paste0('../results/miRNAs_neurons_enrichment/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
 source("miRNAseq_functions.R")
 
 Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
@@ -129,7 +129,7 @@ if(Merge.techinical.replicates.N2){
     #design = design[-index[-1], ]
     stats = stats[, -index[-1]]
   }
-} 
+}
 
 mm = match(design.matrix$SampleID, colnames(stats))
 
@@ -223,7 +223,7 @@ if(Use.ComBat.for.batch.correction){
 }
 
 ## double check the batch correction
-pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_",  version.analysis, ".pdf")
+pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_rgef-1",  version.analysis, ".pdf")
 pdf(pdfname, width=12, height = 12)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 
@@ -267,8 +267,10 @@ mm = match(c("lsy-6", "mir-791", "mir-790"), rownames(cpm.piRNA.bc))
 cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))]
 log2(cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))])
 
-log2(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))]) - log2(cpm.piRNA.bc.meanrep[mm, 2])
-(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))]) - cpm.piRNA.bc.meanrep.log2[mm, 2]
+(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
+log2(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
+(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
+
 
 save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, design.matrix, 
      file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
@@ -337,6 +339,11 @@ if(Save.Processed.Tables)
   
   #write.table(expression, file = paste0(tabDir, "Expression_Matrix_select_14samples_allgenes_",  version.analysis, ".txt"), 
   #            sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
+  write.table(cpm.piRNA.bc, 
+              file = paste0(tabDir, "Expression_Matrix_piRNA_normalization_batchCorrected_allgenes_N2_background_all_samples_withReplcates", 
+                            version.analysis, 
+                            ".txt"), 
+              sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
   
   write.table(xx, 
               file = paste0(tabDir, "Expression_Matrix_piRNA_normalization_average_replicates_remove_batch_allgenes_N2_background_all_samples_", 
@@ -348,7 +355,9 @@ if(Save.Processed.Tables)
 
 ######################################
 ######################################
-## Section: calculate pvalue for overlapping groups
+## Section (additional) : 
+# other utility plots or tables
+# calculate pvalue for overlapping groups
 ######################################
 ######################################
 calculate.pval.for.overlapping.groups = FALSE
@@ -376,7 +385,3 @@ if(calculate.pval.for.overlapping.groups){
   write.xlsx(aa, file='..//results/decomvolution_results/pvalue_overlapping_groups_byJingkui.xlsx')
   
 }
-
-
-
-

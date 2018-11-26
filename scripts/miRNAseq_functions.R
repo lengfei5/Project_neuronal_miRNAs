@@ -592,7 +592,7 @@ average.biological.replicates = function(cpm)
     {
       kk = which(samples == colnames(cpm.mean)[n])
       if(length(kk)>1){
-        cpm.mean[ ,n] = apply(as.matrix(cpm[,kk]), 1, mean)
+        cpm.mean[ ,n] = apply(as.matrix(cpm[,kk]), 1, median)
       }else{
         if(length(kk)==1) cpm.mean[, n] = cpm[,kk]
       }
@@ -1185,7 +1185,10 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   ## double check the expression matrix
   par(mfrow = c(1, 1))
   mm = match(c("Cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
-  plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", ylab = "sum of Cho, Glut, GABA, Dop and Ser")
+  ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
+  
+  plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+       ylab = "sum of Cho, Glut, GABA, Dop and Ser", xlim = ranges, ylim = ranges)
   abline(0, 1, col="red", lwd=2.0)
   #abline(h=1, col="darkgray", lwd=2.0)
   

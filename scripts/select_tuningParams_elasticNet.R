@@ -7,6 +7,204 @@
 # Date of creation: Wed Sep 19 11:09:08 2018
 ##########################################################################
 ##########################################################################
+run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, 
+                                               nlambda = 100, intercept = TRUE, standardize = FALSE,
+                                               Gene.Specific.Alpha = FALSE,  
+                                               method = "cv.lambda.1se",   
+                                               plot.cluster.col = FALSE,
+                                               omit.BIC = TRUE,  plot.crit.bic = TRUE)
+{
+  require(glmnet)
+  library("pheatmap")
+  library("RColorBrewer")
+  
+  # basic arguments for cv.glmnet and glmnet
+  #intercept=TRUE
+  #standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
+  standardize.response=FALSE
+  grouped = FALSE
+  cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+  
+  if(!Gene.Specific.Alpha){
+    ###############################
+    # global alpha parameter is tested in glmnet
+    # so start the loop with alphas 
+    # but it does not work well
+    ###############################
+    results = list();
+    #ii.alpha = 0;
+    for(alpha in alphas)
+    {
+      cat("global alpha --", alpha, "----------\n")
+      # alpha = 0.7; lambda = NULL; nlambda = 200; method = "bic"
+      
+      res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
+      colnames(res) = colnames(y)
+      rownames(res) = colnames(x)
+      set.seed(1)
+      for(n in 1:ncol(y))
+      {
+        # n = 2
+        if(is.null(lambda)){
+          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
+                           standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
+          
+        }else{
+          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
+                           standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+        }
+        
+        #par(mfrow= c(1,1))
+        # plot(cv.fit, main = colnames(y)[n])
+        
+        fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
+                   standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+        
+        myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
+        
+        res[, n] = as.numeric(myCoefs)[-1]
+        
+        #cat("---------------\n", colnames(res)[n], ":\n", 
+        #    paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
+        #    "---------------\n")
+      }
+      
+      if( ! plot.cluster.col){
+        res[which(res==0)] = NA;
+        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 color = cols)
+      }else{
+        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 color = cols)
+        res[which(res==0)] = NA;
+      }
+      
+      results[[which(alphas==alpha)]] = res; 
+    }
+    
+    return(results)
+    
+  }else{
+    ###############################
+    # select gene-specific alpha parameter
+    # so the selection will be done gene by gene
+    # the loop starts with gene
+    # this can be done by home-made, or with examples 
+    # https://www.r-bloggers.com/variable-selection-with-elastic-net/
+    # or https://stats.stackexchange.com/questions/268885/tune-alpha-and-lambda-parameters-of-elastic-nets-in-an-optimal-way (CARET)
+    # https://rpubs.com/ledongnhatnam/250381
+    # https://daviddalpiaz.github.io/r4sl/elastic-net.html
+    ###############################
+    my.own.version = FALSE
+    use.foreach = TRUE
+    use.CARET = FALSE
+    
+    for(n in 1:ncol(y) ){
+      # n = 1
+      
+      cat("start the grid search for tuning parameter alpha -----\n")
+      cat("----n -- ", n, "--", colnames(y)[n],  " -- ")
+      
+      require(glmnet)
+      library(doParallel)
+      
+      if(use.foreach){
+        library(foreach)
+        library(pROC)
+        
+        #pkgs <- list("glmnet", "doParallel", "foreach", "pROC")
+        #lapply(pkgs, require, character.only = T)
+        registerDoParallel(cores = 6)
+        
+        set.seed(2017)
+        #cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
+        #                 standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
+        search <- foreach(i = alphas, .combine = rbind) %dopar% {
+          cv <- cv.glmnet(x, y[,n], family = "gaussian", alpha = i, nfold = 10, nlambda=nlambda, standardize=standardize, lower.limits = 0,
+                          standardize.response=standardize.response, intercept=intercept, grouped = FALSE, paralle = TRUE)
+          data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
+        }
+        
+        cv3 <- search[search$cvm == min(search$cvm), ]
+        cat("selected alpha = ", cv3$alpha, " -- lambda = ", cv3$lambda.1se, "\n")
+        
+        fit=glmnet(x,y[,n], alpha=cv3$alpha, lambda=cv3$lambda.1se, family='gaussian', lower.limits = 0,
+                   standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+        #fit <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
+        #coef(fit)
+        myCoefs <- coef(fit)
+      }
+      
+      if(my.own.version){
+        alphas = seq(0.1, 1.0, by = 0.1)
+        lambda = 10^(seq(4, -2, length.out = 500))
+        # nfolds = 5;
+        #foldid=sample(1:nfolds,size=length(y[,n]),replace=TRUE)
+        #lambdas.save = NULL;
+        lambdas.min = c()
+        lambdas.1se = c()
+        cvms = c()
+        
+        for(m in 1:length(alphas))
+        {
+          #registerDoMC(cores=2)
+          registerDoParallel(detectCores())
+          set.seed(1010);
+          
+          alpha = alphas[m]
+          #cvm = rep(0, length(lambda))
+          
+          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, nfolds = nfolds, 
+                           standardize=standardize, lower.limits = 0, nlambda = length(lambda),
+                           standardize.response=standardize.response, intercept=intercept, grouped = FALSE, parallel = TRUE)
+          
+          #for(k in 1:nb.cv){
+          #  cat(length(cv.fit$cvm), "---\n")
+          #  mm = match(cv.fit$lambda, lambda)
+          #  cvm = cvm + cv.fit$cvm
+          #}
+          #cvm = cvm/nb.cv
+          par(mfrow= c(1,1))
+          plot(cv.fit, main = paste0(colnames(y)[n], "-- alpha : ", alpha))
+          
+          cvms = c(cvms, cv.fit$cvm[which(cv.fit$lambda==cv.fit$lambda.min)])
+          #cvms = c(cvms, cv.fit$cvup[which(cv.fit$lambda==cv.fit$lambda.1se)])
+          #lambdas[[m]] = cv.fit$lambda;
+          lambdas.min = c(lambdas.min, cv.fit$lambda.min)
+          lambdas.1se = c(lambdas.1se, cv.fit$lambda.1se)
+          #plot(fit, label = TRUE)
+          #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
+        }
+        
+        index.alpha = which(cvms==min(cvms))
+        fit=glmnet(x,y[,n], alpha=alphas[index.alpha], lambda=lambda, family='gaussian', lower.limits = 0,
+                   standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+        #myCoefs <- coef(fit, s=lambdas.min[index.alpha]);
+        myCoefs <- coef(fit, s=lambdas.1se[index.alpha]);
+        
+      }
+      
+      res[,n] = as.numeric(myCoefs)[-1]
+      
+      cat("---------------\n", colnames(res)[n], ":\n", 
+          paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
+          "---------------\n")
+      
+    }
+    
+    res[which(res==0)] = NA;
+    pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+             cluster_cols=FALSE, main = paste0("gene-specific alpha - method : ", method), na_col = "gray30",
+             color = cols)
+    
+    return(res)
+  }
+  
+}
+
+
 select.tuning.parameters.for.gcdnet = function(x, y,lambda = NULL, lambda2 = 0.1, method = "cv.lambda.1se", omit.BIC = FALSE,  
                                                nfold = 10, nlambda = 100, standardize = FALSE,  
                                                mse.overfitting.threshold = 10^-5, plot.crit.bic = TRUE, main = NULL)
@@ -259,203 +457,6 @@ select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit,
   
 }
 
-
-run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, nlambda = 100,
-                                               Gene.Specific.Alpha = FALSE,  
-                                               method = "cv.lambda.1se",   
-                                               plot.cluster.col = FALSE,
-                                               omit.BIC = TRUE,  plot.crit.bic = TRUE)
-{
-  require(glmnet)
-  library("pheatmap")
-  library("RColorBrewer")
-  
-  # basic arguments for cv.glmnet and glmnet
-  intercept=TRUE
-  standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
-  standardize.response=FALSE
-  grouped = FALSE
-  cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
-  
-  
-  if(!Gene.Specific.Alpha){
-    ###############################
-    # global alpha parameter is tested in glmnet
-    # so start the loop with alphas 
-    # but it does not work well
-    ###############################
-    results = list();
-    #ii.alpha = 0;
-    for(alpha in alphas)
-    {
-      cat("global alpha --", alpha, "----------\n")
-      # alpha = 0.7; lambda = NULL; nlambda = 200; method = "bic"
-      
-      res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
-      colnames(res) = colnames(y)
-      rownames(res) = colnames(x)
-      
-      for(n in 1:ncol(y))
-      {
-        # n = 2
-        if(is.null(lambda)){
-          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
-                           standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
-          
-        }else{
-          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
-                           standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
-        }
-        
-        #par(mfrow= c(1,1))
-        # plot(cv.fit, main = colnames(y)[n])
-        
-        fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
-                   standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-        
-        myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
-        
-        res[, n] = as.numeric(myCoefs)[-1]
-        
-        #cat("---------------\n", colnames(res)[n], ":\n", 
-        #    paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-        #    "---------------\n")
-      }
-      
-      if( ! plot.cluster.col){
-        res[which(res==0)] = NA;
-        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
-                 color = cols)
-      }else{
-        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
-                 color = cols)
-        res[which(res==0)] = NA;
-      }
-      
-      results[[which(alphas==alpha)]] = res; 
-    }
-    
-    return(results)
-    
-  }else{
-    ###############################
-    # select gene-specific alpha parameter
-    # so the selection will be done gene by gene
-    # the loop starts with gene
-    # this can be done by home-made, or with examples 
-    # https://www.r-bloggers.com/variable-selection-with-elastic-net/
-    # or https://stats.stackexchange.com/questions/268885/tune-alpha-and-lambda-parameters-of-elastic-nets-in-an-optimal-way (CARET)
-    # https://rpubs.com/ledongnhatnam/250381
-    # https://daviddalpiaz.github.io/r4sl/elastic-net.html
-    ###############################
-    my.own.version = FALSE
-    use.foreach = TRUE
-    use.CARET = FALSE
-    
-    for(n in 1:ncol(y) ){
-      # n = 1
-      
-      cat("start the grid search for tuning parameter alpha -----\n")
-      cat("----n -- ", n, "--", colnames(y)[n],  " -- ")
-      
-      require(glmnet)
-      library(doParallel)
-      
-      if(use.foreach){
-        library(foreach)
-        library(pROC)
-        
-        #pkgs <- list("glmnet", "doParallel", "foreach", "pROC")
-        #lapply(pkgs, require, character.only = T)
-        registerDoParallel(cores = 6)
-        
-        set.seed(2017)
-        #cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
-        #                 standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
-        search <- foreach(i = alphas, .combine = rbind) %dopar% {
-          cv <- cv.glmnet(x, y[,n], family = "gaussian", alpha = i, nfold = 10, nlambda=nlambda, standardize=standardize, lower.limits = 0,
-                          standardize.response=standardize.response, intercept=intercept, grouped = FALSE, paralle = TRUE)
-          data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-        }
-        
-        cv3 <- search[search$cvm == min(search$cvm), ]
-        cat("selected alpha = ", cv3$alpha, " -- lambda = ", cv3$lambda.1se, "\n")
-        
-        fit=glmnet(x,y[,n], alpha=cv3$alpha, lambda=cv3$lambda.1se, family='gaussian', lower.limits = 0,
-                   standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-        #fit <- glmnet(mdlX, mdlY, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-        #coef(fit)
-        myCoefs <- coef(fit)
-      }
-        
-      if(my.own.version){
-        alphas = seq(0.1, 1.0, by = 0.1)
-        lambda = 10^(seq(4, -2, length.out = 500))
-        # nfolds = 5;
-        #foldid=sample(1:nfolds,size=length(y[,n]),replace=TRUE)
-        #lambdas.save = NULL;
-        lambdas.min = c()
-        lambdas.1se = c()
-        cvms = c()
-        
-        for(m in 1:length(alphas))
-        {
-          #registerDoMC(cores=2)
-          registerDoParallel(detectCores())
-          set.seed(1010);
-          
-          alpha = alphas[m]
-          #cvm = rep(0, length(lambda))
-          
-          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, nfolds = nfolds, 
-                           standardize=standardize, lower.limits = 0, nlambda = length(lambda),
-                           standardize.response=standardize.response, intercept=intercept, grouped = FALSE, parallel = TRUE)
-          
-          #for(k in 1:nb.cv){
-          #  cat(length(cv.fit$cvm), "---\n")
-          #  mm = match(cv.fit$lambda, lambda)
-          #  cvm = cvm + cv.fit$cvm
-          #}
-          #cvm = cvm/nb.cv
-          par(mfrow= c(1,1))
-          plot(cv.fit, main = paste0(colnames(y)[n], "-- alpha : ", alpha))
-          
-          cvms = c(cvms, cv.fit$cvm[which(cv.fit$lambda==cv.fit$lambda.min)])
-          #cvms = c(cvms, cv.fit$cvup[which(cv.fit$lambda==cv.fit$lambda.1se)])
-          #lambdas[[m]] = cv.fit$lambda;
-          lambdas.min = c(lambdas.min, cv.fit$lambda.min)
-          lambdas.1se = c(lambdas.1se, cv.fit$lambda.1se)
-          #plot(fit, label = TRUE)
-          #plot(fit, xvar = "lambda", label = TRUE); abline(v=log(cv.fit$lambda.min))
-        }
-        
-        index.alpha = which(cvms==min(cvms))
-        fit=glmnet(x,y[,n], alpha=alphas[index.alpha], lambda=lambda, family='gaussian', lower.limits = 0,
-                   standardize=standardize, standardize.response=standardize.response, intercept=intercept)
-        #myCoefs <- coef(fit, s=lambdas.min[index.alpha]);
-        myCoefs <- coef(fit, s=lambdas.1se[index.alpha]);
-        
-      }
-      
-      res[,n] = as.numeric(myCoefs)[-1]
-      
-      cat("---------------\n", colnames(res)[n], ":\n", 
-          paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
-          "---------------\n")
-      
-    }
-    
-    res[which(res==0)] = NA;
-    pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-             cluster_cols=FALSE, main = paste0("gene-specific alpha - method : ", method), na_col = "gray30",
-             color = cols)
-    
-    return(res)
-  }
-  
-}
 
 ###############################
 # test the multiple step adaptive elastic-net (msaenet) to select the tuning parameters for both 
