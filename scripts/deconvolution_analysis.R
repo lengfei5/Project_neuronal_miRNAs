@@ -237,6 +237,17 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
   Plot.ProprotionMatrix.ExpressionMatrix(proportions.sel, expression.sel, fitting.space = "log2")
     
   dev.off()
+  
+  Save.table.for.Chiara = FALSE
+  if(Save.table.for.Chiara){
+    write.csv(proportions.sel, 
+              file = paste0("../results/final_tables_4Chiara/", 
+                            "proportionas_matrix_used4deconvolution", version.analysis, ".csv"), col.names = TRUE, row.names = TRUE)
+    write.csv(expression.sel, 
+              file = paste0("../results/final_tables_4Chiara/", 
+                            "expression_matrix_used4deconvolution", version.analysis, ".csv"), col.names = TRUE, row.names = TRUE)
+  }
+ 
 }
 
 ######################################

@@ -35,7 +35,9 @@ This reprosition is for the deconvolution analysis for Chiara's project
       
   - [ ] Integrate the sample qualities into the linear model ??
   
-  - [ ] Optimize the fitting and parameter to have final results
+  - [ ] Optimize the fitting and parameter
+  
+  - [ ] save the final tables and plots
 
 ### code structure
 - `miRNA_enrichAnalysis_for_neuronClassess.R`
