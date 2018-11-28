@@ -247,6 +247,7 @@ if(Use.ComBat.for.batch.correction){
 }
 
 ## double check the batch correction
+source("RNAseq_Quality_Controls.R")
 pdfname = paste0(resDir, "/Check_batchRemoval_for_rab-3_rgef-1",  version.analysis, ".pdf")
 pdf(pdfname, width=12, height = 12)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -257,9 +258,6 @@ kk = grep("WT_Pan.neurons_treated_", colnames(cpm.piRNA.bc))
 par(mfrow=c(1, 1))
 plot.pair.comparison.plot(cpm.piRNA.bc[, jj], main = paste0("untreate pan-neurons" ,"-- pairwise comparison for piRNA-normalization"))
 plot.pair.comparison.plot(cpm.piRNA.bc[, kk], main = paste0("treate pan-neurons" ,"-- pairwise comparison for piRNA-normalization"))
-
-#plot(cpm.piRNA.bc[, jj1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
-#plot(cpm.piRNA.bc[, kk1[c(1,3)]], log='xy', cex=1.0);  abline(0, 1, col='red', lwd=2.0)
 
 dev.off()
 

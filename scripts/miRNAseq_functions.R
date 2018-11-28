@@ -1152,6 +1152,7 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
       sizefactors = as.numeric(stats.pans$piRNA)
     }else{
       sizefactors = as.numeric(piRNA.sizeFctors.pans)  
+      cat("-- use piRNA size factors --\n")
     }
     cpm.piRNA = pans;
     for(n in 1:ncol(cpm.piRNA)) cpm.piRNA[,n] = cpm.piRNA[,n]/sizefactors[n]*10^6
@@ -1167,9 +1168,8 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
   if(is.null(piRNA.sizeFctors)){
     sizefactors = as.numeric(stats$piRNA)
   }else{
-    cat("-- using piRNA size factors ")
+    cat("-- using piRNA size factors \n")
     sizefactors = as.numeric(piRNA.sizeFctors)
-    
   }
  
   cpm.piRNA = countData;
