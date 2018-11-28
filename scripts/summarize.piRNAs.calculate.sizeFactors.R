@@ -7,10 +7,18 @@
 # Date of creation: Tue Oct  2 14:02:27 2018
 ##########################################################################
 ##########################################################################
-count.piRNA.with.design.matrix = function(design.matrix, recount = FALSE)
+count.piRNA.with.design.matrix = function(design.matrix, Recount = FALSE)
 {
-  if(recount){
+  if(Recount){
+    
+    ##########################################
+    # to count individual piRNAs from Thomas Burkard's pipeline output
+    ##########################################
     library(data.table)
+    
+    version.table = "miRNAs_neurons_v1_2018_03_07"
+    load(file = paste0('../results/miRNAs_neurons_enrichment/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
+    
     dataDir = "../data/normalized_piRNAs/counts_smRNA"
     seqCnt.all <- list.files(dataDir, paste0(file.suffixPrimary, "$"), full.names = TRUE)
     
@@ -18,7 +26,6 @@ count.piRNA.with.design.matrix = function(design.matrix, recount = FALSE)
                            design$genotype == "henn1.mutant"), grep("L3", design$tissue.cell)))
     
     design.matrix = design[-kk, ]
-    
     
     test.if.samples.there = FALSE
     all = NULL

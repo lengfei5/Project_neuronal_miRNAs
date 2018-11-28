@@ -28,15 +28,6 @@ calculate.sizeFactors.for.piRNAs = TRUE
 load(file = paste0('../results/miRNAs_neurons_enrichment/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
 source("miRNAseq_functions.R")
 
-if(calculate.sizeFactors.for.piRNAs){
-  
-  source("summarize.piRNAs.calculate.sizeFactors.R")
-  
-  
-  
-}
-
-
 Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
 Merge.techinical.replicates.N2 = TRUE
 
