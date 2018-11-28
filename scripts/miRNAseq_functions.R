@@ -1287,5 +1287,64 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   
 }
 
+Compare.pan.neuron.vs.other.five.samples = function(cpm.piRNA.bc)
+{
+  selections = c("all", "rab-3", "rgef-1")
+  for(sel in selections)
+  {
+    if(sel == "all") cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+    if(sel == "rab-3") {
+      cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, c(1:64)])
+    }
+    if(sel=="rgef-1"){
+      cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, -c(59:64)])
+    }
+    
+    jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
+    total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
+    xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
+    ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+    
+    colnames(xx) = c('whole.body', 'background', ncs)
+    
+    expression = xx[, -c(1:2)]
+    for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
+    
+    expression = xx[, -c(1:2)]
+    for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
+    #expression = cpm.piRNA.bc.meanrep[, setdiff(kk, index.N2)] - cpm.piRNA.bc.meanrep[, index.N2]   
+    #expression[which(expression<0)] = 0
+    
+    enriched.list = read.table(file = paste0(resDir, "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
+                               sep = "\t", header = TRUE, row.names = 1)
+    enriched.list = colnames(enriched.list)
+    enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
+    mm = match((enriched.list), rownames(expression))
+    
+    expression.sel = t(expression[mm, ])
+    expression.sel = log2(expression.sel)
+    
+    
+    ## double check the expression matrix
+    par(mfrow = c(1, 1))
+    yy = expression.sel
+    mm = match(c("cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
+    #ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
+    
+    plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel)
+    abline(0, 1, col="red", lwd=2.0)
+    #abline(h=1, col="darkgray", lwd=2.0)
+    
+    text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
+         pos = 1, offset = 0.4) 
+  }
+  
+  
+}
+
+
+
 
 

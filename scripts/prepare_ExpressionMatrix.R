@@ -281,6 +281,18 @@ dev.off()
 ## average the biological replicates
 source("miRNAseq_functions.R")
 
+Test.which.Pan.neurons.to.use = FALSE
+if(Test.which.Pan.neurons.to.use){
+  pdfname = paste0(resDir, "/Select_pan.neurons_by_compare_otherSamples_",  version.analysis, ".pdf")
+  pdf(pdfname, width=12, height = 8)
+  par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  source("miRNAseq_functions.R")
+  Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
+  
+  dev.off()
+}
+
 cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
 cpm.piRNA.bc.meanrep.log2 = average.biological.replicates(log2(cpm.piRNA.bc))
 
