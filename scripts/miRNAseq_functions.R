@@ -415,6 +415,30 @@ Merge.techinical.replicates.using.design.countTable = function(design, all, id.l
               countTable = all))
 }
 
+Merge.techinical.replicates = function(stats, rep.technical = list(c("57751", "57753"), c("57752", "57754")))
+{
+  for(n in 1:length(rep.technical))
+  {
+    index = c()
+    for(id in rep.technical[[n]])
+    {
+      #print(id)
+      index = c(index, which(colnames(stats)==id))
+    }
+    
+    #design$SampleID[index[1]] = paste0(design$SampleID[index], collapse = ".")
+    ss = apply(stats[, index], 1, function(x) sum(x, na.rm = TRUE))
+    stats[, (index[1])] = ss;
+    colnames(stats)[index[1]] = paste0(colnames(stats)[index], collapse = ".")
+    #paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  design$SampleID[index[1]])
+    #design = design[-index[-1], ]
+    stats = stats[, -index[-1]]
+  }
+  
+  return(stats)
+  
+}
+
 ######################################
 ######################################
 ## Section: functions to identify expressed miRNAs and also mature arms for those expressed miRNAs
@@ -947,54 +971,78 @@ expressionMatrix.grouping = function(xx, using.logscale = TRUE)
   
 }
 
+calculate.sizeFactors4piRNAs = function(read.count, design.matrix, lowlyExpressed.readCount.threshold = 10)
+{
+  require('DESeq2');
+  if(ncol(design.matrix)>2){cc = apply(design.matrix[, -1], 1, paste0, collapse="_")
+  }else{cc = design.matrix[, -1]}
+  
+  raw = as.matrix(read.count)
+  raw[which(is.na(raw))] = 0
+  
+  countData = ceiling(raw)
+  conds = factor(paste0(colnames(design.matrix)[-1], collapse = " + "))
+  eval(parse(text = paste0("dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ ", conds, ")")))
+  #dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ condition + time)
+  if(is.null(lowlyExpressed.readCount.threshold))  lowlyExpressed.readCount.threshold = 10
+  dds <- dds[ rowSums(counts(dds)) >= lowlyExpressed.readCount.threshold, ]
+  
+  dds <- estimateSizeFactors(dds)
+  
+  return(sizeFactors(dds))
+  
+}
+
 Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats, countData, design.matrix, 
-                                                            compareSpikeIn = TRUE, cpm.pairwise.compare=FALSE)
+                                                            compareSpikeIn = TRUE, cpm.pairwise.compare=FALSE, 
+                                                            piRNA.sizeFctors=NULL)
 {
   ###############################
   ## check the correlation of stats
   ###############################
-  par(mfrow=c(1, 1))
-  library(corrplot)
-  col1 <- colorRampPalette(c("#7F0000","red","#FF7F00","yellow","white", 
-                             "cyan", "#007FFF", "blue","#00007F"))
-  xx = as.matrix(stats)
-  xx[which(xx==0)] = NA
-  M <- cor(xx, use = "na.or.complete")
-  #corrplot(M, method="circle", type = 'upper', order="hclust")
-  corrplot(M, method="ellipse", order="hclust", tl.cex=1.2, cl.cex=0.7, tl.col="black", 
-           addrect=ceiling(ncol(xx)/2), col=col1(100), rect.col=c('green'), rect.lwd=2.0)
-  
-  par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(2, 2))
-  plot(stats$piRNA, stats$siRNA, log='xy', xlab = "piRNA total reads", ylab = "siRNA total reads");
-  abline(log10(median(stats$siRNA/stats$piRNA)), 1, lwd=2.0, col='red')
-  
-  plot(stats$piRNA, stats$piRNA_AS, log='xy', xlab = "piRNA total reads", ylab = "piRNA_AS total reads");
-  abline(log10(median(stats$piRNA_AS/stats$piRNA)), 1, lwd=2.0, col='red')
-  
-  #source('RNAseq_Quality_Controls.R')
-  #pairs(stats, lower.panel=NULL, upper.panel=panel.fitting)
-  plot(library.sizes, stats$piRNA, log = 'xy', xlab = "miRNA total reads", ylab="piRNA total reads")
-  plot(library.sizes, stats$siRNA, log = 'xy', xlab = "miRNA total reads", ylab="siRNA total reads")
-  
-  cc = apply(design.matrix[, c(3,5)], 1, paste0, collapse="_");
-  cc.uniq = unique(cc);
-  cols = match(cc, cc.uniq)
-  
-  par(cex = 1.8, las = 1, mgp = c(1.6,0.5,0), mar = c(6,18,2,0.8)+0.1, tcl = -0.3)
-  par(mfrow=c(1, 1))
-  barplot(library.sizes/stats$good_reads*100, horiz = TRUE, xlim = c(0, 100),
-          names.arg = colnames(countData), las=1, col = cols, 
-          main='miRNA reads/good reads', xlab='percentages (%)')
-  
-  barplot(stats$piRNA/stats$good_reads*100, horiz = TRUE, xlim = c(0, 100),
-          names.arg = colnames(countData), las=1, col = cols, 
-          main='piRNA reads/good reads', xlab='percentages (%)')
-  
-  barplot(stats$siRNA/stats$good_reads*100, horiz = TRUE, xlim = c(0, 100),
-          names.arg = colnames(countData), las=1, col = cols, 
-          main='siRNA reads/good reads', xlab='percentages (%)')
-  
+  if(is.null(piRNA.sizeFctors)){
+    par(mfrow=c(1, 1))
+    library(corrplot)
+    col1 <- colorRampPalette(c("#7F0000","red","#FF7F00","yellow","white", 
+                               "cyan", "#007FFF", "blue","#00007F"))
+    xx = as.matrix(stats)
+    xx[which(xx==0)] = NA
+    M <- cor(xx, use = "na.or.complete")
+    #corrplot(M, method="circle", type = 'upper', order="hclust")
+    corrplot(M, method="ellipse", order="hclust", tl.cex=1.2, cl.cex=0.7, tl.col="black", 
+             addrect=ceiling(ncol(xx)/2), col=col1(100), rect.col=c('green'), rect.lwd=2.0)
+    
+    par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    par(mfrow=c(2, 2))
+    plot(stats$piRNA, stats$siRNA, log='xy', xlab = "piRNA total reads", ylab = "siRNA total reads");
+    abline(log10(median(stats$siRNA/stats$piRNA)), 1, lwd=2.0, col='red')
+    
+    plot(stats$piRNA, stats$piRNA_AS, log='xy', xlab = "piRNA total reads", ylab = "piRNA_AS total reads");
+    abline(log10(median(stats$piRNA_AS/stats$piRNA)), 1, lwd=2.0, col='red')
+    
+    #source('RNAseq_Quality_Controls.R')
+    #pairs(stats, lower.panel=NULL, upper.panel=panel.fitting)
+    plot(library.sizes, stats$piRNA, log = 'xy', xlab = "miRNA total reads", ylab="piRNA total reads")
+    plot(library.sizes, stats$siRNA, log = 'xy', xlab = "miRNA total reads", ylab="siRNA total reads")
+    
+    cc = apply(design.matrix[, c(3,5)], 1, paste0, collapse="_");
+    cc.uniq = unique(cc);
+    cols = match(cc, cc.uniq)
+    
+    par(cex = 1.8, las = 1, mgp = c(1.6,0.5,0), mar = c(6,18,2,0.8)+0.1, tcl = -0.3)
+    par(mfrow=c(1, 1))
+    barplot(library.sizes/stats$good_reads*100, horiz = TRUE, xlim = c(0, 100),
+            names.arg = colnames(countData), las=1, col = cols, 
+            main='miRNA reads/good reads', xlab='percentages (%)')
+    
+    barplot(stats$piRNA/stats$good_reads*100, horiz = TRUE, xlim = c(0, 100),
+            names.arg = colnames(countData), las=1, col = cols, 
+            main='piRNA reads/good reads', xlab='percentages (%)')
+    
+    barplot(stats$siRNA/stats$good_reads*100, horiz = TRUE, xlim = c(0, 100),
+            names.arg = colnames(countData), las=1, col = cols, 
+            main='siRNA reads/good reads', xlab='percentages (%)')
+  }
   ###############################
   # compare spike-in normalization and piRNA-normalization 
   ###############################
@@ -1018,11 +1066,12 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     
     mm = match(colnames(spikes), colnames(countData))
     
-    rab3 = rbind(as.matrix(spikes), as.matrix(countData[,mm]));
-    stats.rab3 = stats[mm, ]
-    library.sizes.rab3 = library.sizes[mm]
-    index.spikeIn = grep("spikeIn", rownames(rab3))[c(1:8)]
-    design.matrix.rab3 = design.matrix[mm, ]
+    pans = rbind(as.matrix(spikes), as.matrix(countData[,mm]));
+    stats.pans = stats[mm, ]
+    library.sizes.pans = library.sizes[mm]
+    index.spikeIn = grep("spikeIn", rownames(pans))[c(1:8)]
+    design.matrix.pans = design.matrix[mm, ]
+    piRNA.sizeFctors.pans = piRNA.sizeFctors[mm]
     
     # here the concentration is amol per mug of total RNA
     concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25)*100
@@ -1030,7 +1079,7 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     ## calculate scaling factor using spike-ins
     #source("miRNAseq_functions.R")
     par(mfrow=c(2,2))
-    res.spike.in = calculate.scaling.factors.using.spikeIns(rab3, concentrations = concentrations, 
+    res.spike.in = calculate.scaling.factors.using.spikeIns(pans, concentrations = concentrations, 
                                                             index.spikeIn = index.spikeIn, read.threshold = 10)
     cpm = res.spike.in$cpm;
     res = res.spike.in$normalization.spikeIn
@@ -1039,44 +1088,72 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     
     ## double check total number of reads with and without spike-ins
     par(mfrow=c(2,2))
-    ss = apply(rab3[-c(1:8),], 2, sum)
-    plot(ss, library.sizes.rab3, log='', xlab='read nbs of expressed miRNAs', ylab='read nbs of all miRNAs')
+    ss = apply(pans[-c(1:8),], 2, sum)
+    plot(ss, library.sizes.pans, log='', xlab='read nbs of expressed miRNAs', ylab='read nbs of all miRNAs')
     abline(0, 1, lwd=2.0, col='red')
     
-    ss = apply(rab3, 2, sum);
-    plot(ss, library.sizes.rab3, log='', xlab='read nbs of expressed miRNAs + spikeIns', ylab='read nbs of all miRNAs')
+    ss = apply(pans, 2, sum);
+    plot(ss, library.sizes.pans, log='', xlab='read nbs of expressed miRNAs + spikeIns', ylab='read nbs of all miRNAs')
     abline(0, 1, lwd=2.0, col='red')
     
     ## double check the cpm and spike-in normalization
-    ss = apply(rab3, 2, sum)
+    ss = apply(pans, 2, sum)
     #par(mfrow=c(1,2))
-    plot(rab3[,1]/ss[1]*10^6, cpm[,1], log='xy', main = 'confirming cpm caclulation'); abline(0, 1, lwd=2.0, col='red')
-    plot(rab3[,1]/ss[1]*10^6*res.spike.in$scaling.factors[1], res[,1], log='xy', main = "confirming spike-in normalization"); 
+    plot(pans[,1]/ss[1]*10^6, cpm[,1], log='xy', main = 'confirming cpm caclulation'); abline(0, 1, lwd=2.0, col='red')
+    plot(pans[,1]/ss[1]*10^6*res.spike.in$scaling.factors[1], res[,1], log='xy', main = "confirming spike-in normalization"); 
     abline(0, 1, lwd=2.0, col='red')
     
     #plot(raw[,1]/ss[1]*10^6/norms[1], res[,1], log='xy');abline(0, 1, lwd=2.0, col='red')
-    sf.p = stats.rab3$piRNA/10^6
-    #sf.p = sf.p/sf.p[1]
+    sf.p = stats.pans$piRNA/10^6
     sf.s = res.spike.in$norms4DESeq2
     #sf.s = sf.s/sf.s[1]
-    
-    par(mfrow=c(1,1))
-    plot(sf.s, sf.p, log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=2.0, xlim = c(4, 400), ylim = c(0.2, 100),
-          xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
-    #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
-    text(sf.s, sf.p, labels = colnames(rab3), offset = 0.5, pos = 1, cex = 0.7)
+    if(is.null(piRNA.sizeFctors)){
+      par(mfrow=c(1,1))
+      plot(sf.s, sf.p, log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=1.5, xlim = c(4, 400), ylim = c(0.2, 50),
+           xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
+      #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
+      text(sf.s, sf.p, labels = colnames(pans), offset = 0.5, pos = 1, cex = 0.7)
+    }else{
+      par(mfrow=c(2,2))
+      sf.pp = piRNA.sizeFctors.pans
+      plot(sf.s, sf.p, log='xy', main = "spikeIns norm vs piRNAs library", col='darkgreen', pch=16, cex=1.5, xlim = c(4, 400), ylim = c(0.2, 100),
+           xlab= 'sizeFactor.spikeIns', ylab='piRNA library.size')
+      #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
+      text(sf.s, sf.p, labels = colnames(pans), offset = 0.5, pos = 1, cex = 0.7)
+      
+      plot(sf.p, sf.pp, log='xy', main = "piRNA library vs sizeFactors ", col='darkgreen', pch=16, cex=1.5,
+           xlab= 'piRNA library size', ylab='sizeFactor.piRNAs')
+      #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
+      text(sf.p, sf.pp, labels = colnames(pans), offset = 0.5, pos = 1, cex = 0.7)
+     
+      plot(sf.s, sf.pp, log='xy', main = "spikeIns norm vs piRNAs sizeFactors", col='darkgreen', pch=16, cex=1.5, xlim = c(4, 400), ylim = c(0.1, 10),
+           xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
+      #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
+      text(sf.s, sf.pp, labels = colnames(pans), offset = 0.5, pos = 1, cex = 0.7)
+      
+      kk = c(grep("71822", colnames(pans)), grep("71823", colnames(pans)))
+      
+      plot(sf.s[-kk], sf.pp[-kk], log='xy', main = "spikeIns norm vs piRNAs sizeFactors", col='darkgreen', pch=16, cex=1.5, xlim = c(4, 400), ylim = c(0.1, 10),
+           xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
+      #abline(0, (median(sf.pp[-kk]/sf.s[-kk])), lwd=2.0, col="red")
+      text(sf.s[-kk], sf.pp[-kk], labels = colnames(pans)[-kk], offset = 0.5, pos = 1, cex = 0.7)
+      
+    }
     
     # compare the cpm, spike-in normalization and piRNA normalization
     par(mfrow=c(1,1))
     source("RNAseq_Quality_Controls.R")
-    o1 = order(design.matrix.rab3$treatment, design.matrix.rab3$promoter);
+    o1 = order(design.matrix.pans$treatment, design.matrix.pans$promoter);
     plot.pair.comparison.plot(cpm[, o1], main = "rab-3 WT pairwise comparison for cpm ")
-    #my.plotPCA(cpm, design.matrix = design.matrix.rab3)
+    #my.plotPCA(cpm, design.matrix = design.matrix.pans)
     plot.pair.comparison.plot(res[, o1], main = "rab-3 pairwise comparison for spike-in normalization")
-    #my.plotPCA(res, design.matrix = design.matrix.rab3)
-    
-    sizefactors = as.numeric(stats.rab3$piRNA)
-    cpm.piRNA = rab3;
+    #my.plotPCA(res, design.matrix = design.matrix.pans)
+    if(is.null(piRNA.sizeFctors)){
+      sizefactors = as.numeric(stats.pans$piRNA)
+    }else{
+      sizefactors = as.numeric(piRNA.sizeFctors.pans)  
+    }
+    cpm.piRNA = pans;
     for(n in 1:ncol(cpm.piRNA)) cpm.piRNA[,n] = cpm.piRNA[,n]/sizefactors[n]*10^6
     
     plot.pair.comparison.plot(cpm.piRNA[, o1], main = "rab-3 pairwise comparison for piRNA-normalization")
@@ -1087,7 +1164,14 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
   # check the cpms and spike-in normalized data
   ###############################
   cpms = my.cpm.normalization(countData = countData)
-  sizefactors = as.numeric(stats$piRNA)
+  if(is.null(piRNA.sizeFctors)){
+    sizefactors = as.numeric(stats$piRNA)
+  }else{
+    cat("-- using piRNA size factors ")
+    sizefactors = as.numeric(piRNA.sizeFctors)
+    
+  }
+ 
   cpm.piRNA = countData;
   for(n in 1:ncol(cpm.piRNA)) cpm.piRNA[,n] = cpm.piRNA[,n]/sizefactors[n]*10^6
   
@@ -1107,8 +1191,8 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
   ###############################
   # compare the rab-3 untreated with other untreated samples
   ###############################
-  Compare.rab3.vs.other.untreated = FALSE
-  if(Compare.rab3.vs.other.untreated){
+  Compare.pans.vs.other.untreated = FALSE
+  if(Compare.pans.vs.other.untreated){
     kk = grep("untreated_", colnames(cpm.piRNA))
     par(mfrow=c(3,2))
     for(n in kk){

@@ -16,7 +16,7 @@ tabDir = paste0(resDir, "/tables/")
 if(!dir.exists(resDir)) dir.create(resDir)
 if(!dir.exists(tabDir)) dir.create(tabDir)
 Save.Processed.Tables = TRUE
-version.analysis = "neuronal_miRNAs_20181120"
+version.analysis = "neuronal_miRNAs_20181128"
 
 calculate.sizeFactors.for.piRNAs = TRUE
 
@@ -49,7 +49,8 @@ if(Merge.techinical.replicates.N2){
     design$SampleID[index[1]] = paste0(design$SampleID[index], collapse = ".")
     ss = apply(all[, (index+1)], 1, function(x) sum(x, na.rm = TRUE))
     all[, (index[1]+1)] = ss;
-    colnames(all)[(index[1]+1)] = paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  design$SampleID[index[1]])
+    colnames(all)[(index[1]+1)] = paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  
+                                         design$SampleID[index[1]])
     design = design[-index[-1], ]
     all = all[, -(index[-1]+1)]
   }
@@ -96,6 +97,11 @@ if(length(kk)>0){
 # 2) try to calculate the sizefactors from individual piRNA 
 ######################################
 ######################################
+load(file = "../results/tables_for_decomvolution/Rdata/rawCounts_table_for_piRNAs.Rdata") # piRNA counts
+rownames(piRNA.counts) = piRNA.counts$gene
+piRNA.counts = as.matrix(piRNA.counts[, -1])
+piRNA.counts[which(is.na(piRNA.counts))] = 0
+
 stat.list = list.files(path = statDir, pattern = "*_cnt.typeHierarchy.txt", full.names = TRUE)
 stats = NULL;
 for(n in 1:length(stat.list))
@@ -113,36 +119,26 @@ stats = stats[, -1]
 
 colnames(stats) = sapply(colnames(stats), function(x) gsub('count.', '', x), USE.NAMES = FALSE)
 
-
 ## need to merge again the techinical replicates for N2
 if(Merge.techinical.replicates.N2){
+  source("miRNAseq_functions.R")
+  
   rep.technical = list(c("57751", "57753"), c("57752", "57754"))
-  for(n in 1:length(rep.technical))
-  {
-    index = c()
-    for(id in rep.technical[[n]])
-    {
-      #print(id)
-      index = c(index, which(colnames(stats)==id))
-    }
-    
-    #design$SampleID[index[1]] = paste0(design$SampleID[index], collapse = ".")
-    ss = apply(stats[, index], 1, function(x) sum(x, na.rm = TRUE))
-    stats[, (index[1])] = ss;
-    colnames(stats)[index[1]] = paste0(colnames(stats)[index], collapse = ".")
-      #paste0(design$genotype[index[1]], "_", design$tissue.cell[index[1]], "_", design$treatment[index[1]], "_",  design$SampleID[index[1]])
-    #design = design[-index[-1], ]
-    stats = stats[, -index[-1]]
-  }
+  stats = Merge.techinical.replicates(stats = stats, rep.technical = rep.technical)
+  piRNA.counts = Merge.techinical.replicates(stats = piRNA.counts, rep.technical = rep.technical)
 }
 
 mm = match(design.matrix$SampleID, colnames(stats))
-
 stats = stats[, mm]
 colnames(stats) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
 stats = data.frame(t(stats))
 
-save(stats, countData, design.matrix, library.sizes, file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
+mm = match(design.matrix$SampleID, colnames(piRNA.counts))
+piRNA.counts = piRNA.counts[, mm]
+colnames(piRNA.counts) = paste0(design.matrix$genotype, "_", design.matrix$tissue.cell, "_", design.matrix$treatment, "_", design.matrix$SampleID)
+
+save(stats, piRNA.counts, countData, design.matrix, library.sizes, 
+     file = paste0(RdataDir, 'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', version.table, '.Rdata'))
 
 ########################################################
 ########################################################
@@ -167,6 +163,29 @@ if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
   
   source("miRNAseq_functions.R")
   Compare.piRNA.siRNA.spikeIns.for.scaling.factors(library.sizes, stats, countData, design.matrix)
+  
+  #Compare.piRNA.librarysize.vs.sizeFactors.vs.spikeIns(library.sizes, stats, piRNA.counts, countData, design.matrix)
+  
+  dev.off()
+  
+  pdfname = paste0(resDir, "/QC_for_piRNAs_countTable_", version.analysis,  ".pdf")
+  pdf(pdfname, width=20, height = 14)
+  par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  Check.RNAseq.Quality(read.count=piRNA.counts, design.matrix = design.matrix[, c(1, 3,5)], lowlyExpressed.readCount.threshold = 20)
+  
+  dev.off()
+  
+  pdfname = paste0(resDir, "/Compare_piRNAs_librarySize_vs_sizeFactors_spikeIns_", version.analysis,  ".pdf")
+  pdf(pdfname, width=20, height = 14)
+  par(cex =0.7, mar = c(5,5,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  source("miRNAseq_functions.R")
+  piRNA.sizeFctors = calculate.sizeFactors4piRNAs(read.count = piRNA.counts, design.matrix = design.matrix[, c(1, 3, 5)], 
+                                                  lowlyExpressed.readCount.threshold = 100)
+  
+  plot(piRNA.sizeFctors, stats$piRNA, log = 'xy', xlab = "size factors", ylab = 'piRNA library size', cex = 1.5)
+  Compare.piRNA.siRNA.spikeIns.for.scaling.factors(library.sizes, stats, countData, design.matrix, 
+                                                                      piRNA.sizeFctors = piRNA.sizeFctors)
   
   dev.off()
 
