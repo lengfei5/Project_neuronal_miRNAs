@@ -18,6 +18,8 @@ if(!dir.exists(tabDir)) dir.create(tabDir)
 Save.Processed.Tables = TRUE
 version.analysis = "neuronal_miRNAs_20181120"
 
+calculate.sizeFactors.for.piRNAs = TRUE
+
 ######################################
 ######################################
 ## Section: load count tables for miRNAs and prepare statistics for piRNA and siRNAs for normalization
@@ -25,6 +27,15 @@ version.analysis = "neuronal_miRNAs_20181120"
 ######################################
 load(file = paste0('../results/miRNAs_neurons_enrichment/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
 source("miRNAseq_functions.R")
+
+if(calculate.sizeFactors.for.piRNAs){
+  
+  source("summarize.piRNAs.calculate.sizeFactors.R")
+  
+  
+  
+}
+
 
 Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
 Merge.techinical.replicates.N2 = TRUE
@@ -89,7 +100,9 @@ if(length(kk)>0){
 
 ######################################
 ######################################
-## Section: import and reform the piRNAs, siRNAs statistics for all samples
+## Section: piRNA normalization 
+# 1) import and reform the piRNAs, siRNAs statistics for all samples
+# 2) try to calculate the sizefactors from individual piRNA 
 ######################################
 ######################################
 stat.list = list.files(path = statDir, pattern = "*_cnt.typeHierarchy.txt", full.names = TRUE)
@@ -108,6 +121,7 @@ rownames(stats) = stats[, 1]
 stats = stats[, -1]
 
 colnames(stats) = sapply(colnames(stats), function(x) gsub('count.', '', x), USE.NAMES = FALSE)
+
 
 ## need to merge again the techinical replicates for N2
 if(Merge.techinical.replicates.N2){
