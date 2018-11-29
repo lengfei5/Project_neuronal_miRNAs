@@ -269,8 +269,8 @@ par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 source("miRNAseq_functions.R")
 
 Test.piRNA.normalization.batch.removal(cpm.piRNA, design.matrix)
-#Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
-#Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.limma, design.matrix)
+Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
+Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.limma, design.matrix)
 Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.combat, design.matrix)
 
 dev.off()
