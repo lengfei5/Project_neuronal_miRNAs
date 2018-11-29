@@ -18,7 +18,7 @@ if(!dir.exists(tabDir)) dir.create(tabDir)
 Save.Processed.Tables = TRUE
 version.analysis = "neuronal_miRNAs_20181128"
 
-calculate.sizeFactors.for.piRNAs = TRUE
+calculate.sizeFactors.for.piRNAs = FALSE
 
 ######################################
 ######################################
@@ -223,7 +223,6 @@ Remove.pan.neurons.samples.71822.71823.as.outliers = TRUE
 source("miRNAseq_functions.R")
 design.matrix$batch = c(rep(1, 4), rep(2, 2), rep(c(3:14), each=4), rep(17, 4), rep(15, 2), rep(16, 2), rep(18, 8))
 
-
 if(Remove.pan.neurons.samples.71822.71823.as.outliers)
 {
   kk = match(c(71822:71823), design.matrix$SampleID)
@@ -234,7 +233,12 @@ if(Remove.pan.neurons.samples.71822.71823.as.outliers)
 
 #method.sel = 'linear.model'
 ## remove batch effect by scaling the untreated samples using N2 as the reference
+pdfname = paste0(resDir, "/Check_batch_difference_",  version.analysis, ".pdf")
+pdf(pdfname, width=12, height = 12)
+par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 cpm.piRNA.bc.my = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'linear.model')
+dev.off()
+
 cpm.piRNA.bc.limma = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'limma')
 cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, method = 'combat')
 
@@ -262,7 +266,7 @@ plot.pair.comparison.plot(cpm.piRNA.bc[, kk], main = paste0("treate pan-neurons"
 dev.off()
 
 pdfname = paste0(resDir, "/Check_piRNA_normalization_batchRemoval_",  version.analysis, ".pdf")
-pdf(pdfname, width=20, height = 8)
+pdf(pdfname, width=18, height = 6)
 par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 #par(mfrow=c(1, 1))
 # par(mfcol=c(1, 1))

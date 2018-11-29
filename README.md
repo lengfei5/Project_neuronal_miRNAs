@@ -18,21 +18,21 @@ This reprosition is for the deconvolution analysis for Chiara's project
       - so at the end, the global alpha and one-standard-error method is chosen to fit the data
       - [x] try BIC, AIC, EBIC with propre degree of freedom for gcdnet with global lambda2
       - [x] try BIC, AIC, EBIC for glmnet with global alpha
-    
-  - [X] Double check the batch correction works 
-    - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
-    - The reason requires further understanding of batch correction methods.    
-    - [x] double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
-    - [x] By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
-    - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
-    
-  - [x] Improve the piRNA normalization by using individual piRNA read count
+      
+ - [x] Improve the piRNA normalization by using individual piRNA read count
     - To count the reads for miRNA (and piRNAs), there are just one R function to do it in Thomas' pipleline.  
       - functions.miRNASummarize.R (most comprehensive counting, considering different 5' or isoforms, count only the most abundance 5' or isoform and ignore 
         others )
       - functions.miRNASummarize.no.fixation.R (pool different 5' or isoforms) 
       - total different R function in nextflow pipeline (suppose to give same results as functions.miRNASummarize.no.fixation.R)
-    - at the end my own function was coded and the conclusion for this step is that the size.factors calcluated from piRNA count table is the very similar to piRNA library size. 
+    - at the end my own function was coded and the conclusion for this step is that the size.factors calcluated from piRNA count table is the very similar to piRNA library size.   
+    
+  - [ ] Double check the batch correction works  ??
+    - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
+    - The reason requires further understanding of batch correction methods.    
+    - [x] double check the data before and after batch correction for example lsy-6, mir-791 and mir-790 
+    - [x] By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
+    - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
   
   - [ ] Improve the model fitting, especially for known examples, lsy-6 
   

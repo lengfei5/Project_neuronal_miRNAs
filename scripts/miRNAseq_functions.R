@@ -677,7 +677,7 @@ remove.batch.using.N2.untreated = function(cpm, design.matrix, method = "linear.
     batchs = batchs[which(batchs != 1)]
     for(n in 1:length(batchs))
     {
-      n = 16;
+      #n = 16;
       jj.untreated = which(pheno$batch == batchs[n] & pheno$treatment == "untreated")
       if(length(jj.untreated)>0)
       {
@@ -685,8 +685,9 @@ remove.batch.using.N2.untreated = function(cpm, design.matrix, method = "linear.
         if(length(jj.untreated)>1) x = apply(logcpm[, jj.untreated], 1, mean)
        
         fit = lm(y ~ x)
-        #plot(x, y);
-        #abline(fit, col='red', lwd=2.0)
+        plot(x, y, xlab = "untreated", ylab = "N2");
+        abline(fit, col='red', lwd=2.0)
+        abline(0, 1, col='blue', lwd=2.0)
         jj.to.correct = which(pheno$batch == batchs[n])
         for(j in jj.to.correct) {
           logcpm[, j]  = logcpm[, j]*fit$coefficients[2] + fit$coefficients[1];
@@ -757,11 +758,15 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
   library("dplyr");
   
   ## pca plots only for untreated samples
-  pca = prcomp(t(log2(cpm)), scale. = FALSE, center = FALSE)
-  pca2save = data.frame(pca$x, condition=design.matrix$treatment, batch = design.matrix$batch, name=colnames(cpm), tissue = design.matrix$tissue.cell)
-  sels = which(pca2save$condition == "untreated")
-  ggp = ggplot(data=pca2save[sels, ], aes(PC1, PC2, label = batch, color = tissue)) + geom_point(size=4) +
-    geom_text(hjust = 0.1, nudge_y = 0.1, size=5) +
+  sels = which(design.matrix$treatment == "untreated")
+  pca = prcomp(t(log2(cpm[, sels])), scale. = TRUE, center = TRUE)
+  pca2save = data.frame(pca$x, condition=design.matrix$treatment[sels], 
+                        batch = design.matrix$batch[sels], 
+                        name=colnames(cpm)[sels], 
+                        tissue = design.matrix$tissue.cell[sels])
+  
+  ggp = ggplot(data=pca2save, aes(PC1, PC2, label = batch, color = tissue)) + geom_point(size=4) +
+    geom_text(hjust = 0.1, nudge_y = 0.2, size=5) +
     ggtitle(paste0("PCA - ", main.names))
   plot(ggp);
   #pca=plotPCA(cpm, intgroup = colnames(design.matrix)[c(3, 5, 7)], returnData = FALSE)
@@ -801,15 +806,16 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
   # check three examples lsy-6, mir-791 and mir-790 across all samples
   # different replicates should be also displayed
   ###############################
+  par(mfrow=c(1, 3))
+  
   for(gg in c("lsy-6", "mir-791", "mir-790"))
   {
     #gg = "lsy-6"
-    par(mfrow=c(1, 3))
     par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
     kk = which(rownames(cpm)==gg)
     
-    for(m in c(1:3)){
+    for(m in c(1)){
       if(m == 1) {log = 'y'; lims = range(cpm[kk,]);}
       if(m == 2) {log = ''; lims = range(cpm[kk,]);}
       if(m == 3) {log = ''; lims = range(cpm[kk, which(design.matrix$treatment=="treated")]);}
@@ -830,9 +836,6 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
         
         index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
         points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1.5, pch = 0)
-        
-        
-        
       }
       #legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
       axis(2, las= 1)
