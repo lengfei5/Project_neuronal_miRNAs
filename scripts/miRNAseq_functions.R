@@ -765,10 +765,10 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
                         name=colnames(cpm)[sels], 
                         tissue = design.matrix$tissue.cell[sels])
   
-  ggp = ggplot(data=pca2save, aes(PC1, PC2, label = batch, color = tissue)) + geom_point(size=4) +
-    geom_text(hjust = 0.1, nudge_y = 0.2, size=5) +
-    ggtitle(paste0("PCA - ", main.names))
-  plot(ggp);
+  #ggp = ggplot(data=pca2save, aes(PC1, PC2, label = batch, color = tissue)) + geom_point(size=4) +
+  #  geom_text(hjust = 0.1, nudge_y = 0.2, size=5) +
+  #  ggtitle(paste0("PCA - ", main.names))
+  #plot(ggp);
   #pca=plotPCA(cpm, intgroup = colnames(design.matrix)[c(3, 5, 7)], returnData = FALSE)
   #print(pca)
   
@@ -790,17 +790,16 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
   ###############################
   # check ratios between treated and untreated samples and other two samples
   ###############################
-  par(mfrow=c(1, 3))
-  hist(log10(ratios), xlab = "log10(treated/untreated)", main = paste0(main.names), breaks = 100)
-  abline(v=c(-3:0), col='darkred', lwd=2.0)
+  #par(mfrow=c(1, 3))
+  #hist(log10(ratios), xlab = "log10(treated/untreated)", main = paste0(main.names), breaks = 100)
+  #abline(v=c(-3:0), col='darkred', lwd=2.0)
   
-  plot(tcs[,which(colnames(tcs) == "Dopaminergic.neurons")], tcs[,which(colnames(tcs) == "Ciliated.sensory.neurons")], log='xy', 
-       xlab='Dopaminergic (in log)', ylab='Ciliated (in log)', main = main.names)
-  abline(0, 1, lwd=2.0, col='red')
-  
-  plot(tcs[,which(colnames(tcs) == "mechanosensory.neurons" )], tcs[,which(colnames(tcs) == "unc-86.expressing.neurons")], log='xy', 
-       xlab='mechanosensory (in log)', ylab='unc-86 (in log)', main = main.names)
-  abline(0, 1, lwd=2.0, col='red')
+  #plot(tcs[,which(colnames(tcs) == "Dopaminergic.neurons")], tcs[,which(colnames(tcs) == "Ciliated.sensory.neurons")], log='xy', 
+  #     xlab='Dopaminergic (in log)', ylab='Ciliated (in log)', main = main.names)
+  #abline(0, 1, lwd=2.0, col='red')
+  #plot(tcs[,which(colnames(tcs) == "mechanosensory.neurons" )], tcs[,which(colnames(tcs) == "unc-86.expressing.neurons")], log='xy', 
+  #     xlab='mechanosensory (in log)', ylab='unc-86 (in log)', main = main.names)
+  #abline(0, 1, lwd=2.0, col='red')
   
   ###############################
   # check three examples lsy-6, mir-791 and mir-790 across all samples
@@ -843,6 +842,7 @@ Test.piRNA.normalization.batch.removal = function(cpm, design.matrix)
       ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
       axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
       box()
+      abline(h=c(50, 100, 200, 500, 1000), lwd=0.7, col='red')
       
     }
   }
@@ -1290,17 +1290,20 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   
 }
 
-Compare.pan.neuron.vs.other.five.samples = function(cpm.piRNA.bc)
+Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix)
 {
+  #cpm.piRNA.bc.meanrep.log2 = log2(cpm.piRNA.bc)
+  
   selections = c("all", "rab-3", "rgef-1")
+  # sel = "all"
   for(sel in selections)
   {
-    if(sel == "all") cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+    if(sel == "all") cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc))
     if(sel == "rab-3") {
-      cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, c(1:64)])
+      cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc[, c(1:64)]))
     }
     if(sel=="rgef-1"){
-      cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc[, -c(59:64)])
+      cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc[, -c(59:64)]))
     }
     
     jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
@@ -1312,13 +1315,12 @@ Compare.pan.neuron.vs.other.five.samples = function(cpm.piRNA.bc)
     colnames(xx) = c('whole.body', 'background', ncs)
     
     expression = xx[, -c(1:2)]
-    for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
+    for(n in 1:ncol(expression)) expression[,n] = expression[,n] - xx$background
     
-    expression = xx[, -c(1:2)]
-    for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
+    #expression = xx[, -c(1:2)]
+    #for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
     #expression = cpm.piRNA.bc.meanrep[, setdiff(kk, index.N2)] - cpm.piRNA.bc.meanrep[, index.N2]   
     #expression[which(expression<0)] = 0
-    
     enriched.list = read.table(file = paste0(resDir, "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
                                sep = "\t", header = TRUE, row.names = 1)
     enriched.list = colnames(enriched.list)
@@ -1326,23 +1328,130 @@ Compare.pan.neuron.vs.other.five.samples = function(cpm.piRNA.bc)
     mm = match((enriched.list), rownames(expression))
     
     expression.sel = t(expression[mm, ])
-    expression.sel = log2(expression.sel)
-    
+    #expression.sel = log2(expression.sel)
     
     ## double check the expression matrix
     par(mfrow = c(1, 1))
     yy = expression.sel
+    yy[yy<0] = 0
     mm = match(c("cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
     #ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
     
     plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
-         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel)
+         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = c(-1, 10), ylim = c(-1, 25))
     abline(0, 1, col="red", lwd=2.0)
-    #abline(h=1, col="darkgray", lwd=2.0)
+    abline(0.5, 1, col="red", lwd=1.0, lty = 2)
+    abline(-0.5, 1, col="red", lwd=1.0, lty =2)
+    abline(1, 1, col="red", lwd=1.0, lty=3)
+    abline(-1, 1, col="red", lwd=1.0, lty=3)
+    text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
+         pos = 1, offset = 0.4)
     
-    text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
-         pos = 1, offset = 0.4) 
+    
   }
+  
+  ##########################################
+  # check lsy-6 and other examples
+  ##########################################
+  examples = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124", "mir-1", "mir-243", "lin-4")
+  #kk = match(examples, rownames(cpm.piRNA.bc)
+  ns = unique(design.matrix$tissue.cell)
+  cpm = log2(cpm.piRNA.bc)
+  par(mfrow=c(1, 2))
+  for(gg in examples)
+  {
+    #gg = "lsy-6"
+    par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
+    kk = which(rownames(cpm)==gg)
+    lims = range(cpm[kk, ])
+    plot(c(1:length(ns)), rep(1, length(ns)), type= 'n', col='darkblue', cex=1.0, log='', ylim =lims, main = paste0(gg), xlab=NA, 
+         ylab = 'normalizaed by piRNAs', axe = FALSE)
+    #points(c(1:length(ns)), tcs[kk, ], type = "b", cex=1.0, col = 'darkblue')
+    #points(c(1:length(ns)), total[kk, ], type= 'l', col='black', cex=1.0)
+    #points(c(1:length(ns)), total[kk, ], type= 'b', col= "black", cex= 1.0)
+    
+    ns.mean = c()
+    for(n in 1:length(ns))
+    {
+      index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")
+      points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='darkblue', cex=1., pch =16)
+      ns.mean = c(ns.mean, median(cpm[kk, index.ns]))
+      # add sample ids 
+      if(ns[n]=="Pan.neurons"){
+        text(rep(n, length(index.ns)), cpm[kk, index.ns], design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
+      }
+      
+      index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
+      points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1., pch = 0)
+    }
+    points(c(1:length(ns)), ns.mean, type = "l", cex=1.0, col = 'darkgreen')
+    points(c(1:length(ns)), ns.mean, type = "p", cex=1.0, col = 'darkgreen')
+    #legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
+    axis(2, las= 1)
+    ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
+    ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
+    axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
+    box()
+    #abline(h=c(0, 2, 5), lwd=0.7, col='red')
+    abline(h=c(ns.mean[1]), lwd=1.0, col='red')
+    abline(h=c((ns.mean[1]-1), (ns.mean[1]+1)), lwd=1.0, col='red', lty=2)
+    
+  }
+  
+  ##########################################
+  # check if the promoter-specific backgrounds 
+  ##########################################
+  kk = match(rownames(cpm), enriched.list)
+  #kk = which(is.na(kk))
+  bgs = cpm[which(is.na(kk)), ]
+  #xx = bgs
+  #xx = average.biological.replicates.for.promoters(bgs)
+  jj = which(design.matrix$treatment == "treated")
+  
+  design.bgs = design.matrix[jj, ]
+  xx = bgs[, jj]
+  prots = paste0(design.bgs$tissue.cell, "_", design.bgs$promoter)
+  prots.uniq = unique(prots)
+  
+  yy = c()
+  for(n in 1:length(prots.uniq)) {
+    yy = cbind(yy, apply(xx[, which(prots == prots.uniq[n])], 1, median))
+  }
+  colnames(yy) = prots.uniq
+  
+  #xx = data.frame(apply(xx[, jj], 1, median), xx[, -jj])
+  #ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+  #ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+  #colnames(xx) = c('whole.body', 'background', ncs)
+  #xx = xx[, -c(1)]
+  #for(n in 2:ncol(xx)) xx[,n] = xx[,n] - xx[, 1]
+  
+  intercepts = c()
+  jj = which(apply(yy, 1, mean)<5)
+  for(n in 1:ncol(yy)){
+    intercepts = c(intercepts, mean(yy[jj,n] - yy[jj,1]))
+  }
+  names(intercepts) = colnames(yy)
+  
+  load(file = paste0("../results/tables_for_decomvolution/Rdata/",
+                     "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix_plus_mergedFractionMatrix", 
+                     "_miRNAs_neurons_20180525", ".Rdata"))
+  nbcells = apply(as.matrix(newprop), 1, sum)
+  nbcells = c(0.5,  2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
+  plot(nbcells, intercepts, log='x')
+  text(nbcells, intercepts, names(intercepts), pos=1, cex = 0.6, offset = 0.2)
+  
+  # matplot(t(yy))
+  #plot(yy[, c(1,4)]);abline(0, 1, lwd=1.0, col = 'red')
+  #plot(yy[, c(1,8)]);abline(0, 1, lwd=1.0, col = 'red')
+  #plot(yy[, c(1,7)]);abline(0, 1, lwd=1.0, col = 'red')
+  #plot(yy[, c(1,10)]);abline(0, 1, lwd=1.0, col = 'red')
+  #plot(yy[, c(1,11)]);abline(0, 1, lwd=1.0, col = 'red')
+  #plot(yy[, c(1,2)]);abline(0, 1, lwd=1.0, col = 'red')
+  ##########################################
+  # check the variance for each promoter 
+  ##########################################
   
   
 }

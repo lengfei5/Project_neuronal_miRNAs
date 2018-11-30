@@ -25,7 +25,6 @@ Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene e
 Manually.unifiy.sample.names.forMatrix = TRUE
 Check.ProprotionMatrix.ExpressionMatrix = FALSE
 
-
 version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
@@ -115,12 +114,15 @@ if(Use.mergedFractionMatrix){
 if(!Use.mergedExpressionMatrix){
   
   load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
+  cpm.piRNA.bc = log2(cpm.piRNA.bc)
+  cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+  
   jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
   total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
   xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
   ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
   ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
-  colnames(xx) = c('whole.body', 'background', ncs) 
+  colnames(xx) = c('whole.body', 'background', ncs)
   
   #write.csv(cpm.piRNA.bc, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_replicates.csv")
   #write.csv(cpm.piRNA.bc.meanrep, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_averageRepliciates.csv")
@@ -171,10 +173,10 @@ if(Manually.unifiy.sample.names.forMatrix){
       proportions = yy
     }
   }else{
-    
     yy = expression;
     # log2 (expresion/background)
-    for(n in 1:nrow(yy)) yy[n, ] = log2(as.numeric(yy[n, ])/as.numeric(expression[1,]))
+    #for(n in 1:nrow(yy)) yy[n, ] = log2(as.numeric(yy[n, ])/as.numeric(expression[1,]))
+    for(n in 1:nrow(yy)) yy[n, ] = as.numeric(yy[n, ] - as.numeric(expression[1,]))
     
     yy = yy[-1, ]
     expression = yy;
@@ -332,7 +334,7 @@ for(method in Methods2test)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7,
+  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = FALSE, standardize = TRUE, nfold = 7,
                                       Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
   dev.off()

@@ -35,7 +35,7 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
   
   - [ ] Improve the model fitting, especially for known examples, lsy-6 
-  
+    - [ ] recheck the linear model, especailly the intercept for the background  
     - [ ] Integrate the sample qualities or sample variance into into the linear model ??
     - [ ] post-filtering (i.e. removing non-significant ones)
   

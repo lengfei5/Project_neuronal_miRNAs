@@ -244,11 +244,10 @@ cpm.piRNA.bc.combat = remove.batch.using.N2.untreated(cpm.piRNA, design.matrix, 
 
 #cpm.piRNA.bc.ratio = remove.batch.by.logratios(cpm.piRNA, design.matrix)
 
-if(Use.ComBat.for.batch.correction){
-  cpm.piRNA.bc = cpm.piRNA.bc.combat
-}else{
-  cpm.piRNA.bc = cpm.piRNA.bc.my
-}
+cpm.piRNA.bc = cpm.piRNA.bc.combat
+
+#if(Use.ComBat.for.batch.correction){
+#}else{ cpm.piRNA.bc = cpm.piRNA.bc.my }
 
 ## double check the batch correction
 source("RNAseq_Quality_Controls.R")
@@ -273,7 +272,7 @@ par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 source("miRNAseq_functions.R")
 
 Test.piRNA.normalization.batch.removal(cpm.piRNA, design.matrix)
-Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
+#Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.my, design.matrix)
 Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.limma, design.matrix)
 Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.combat, design.matrix)
 
@@ -284,33 +283,33 @@ dev.off()
 ####################
 ## average the biological replicates
 source("miRNAseq_functions.R")
-
-Test.which.Pan.neurons.to.use = FALSE
-if(Test.which.Pan.neurons.to.use){
-  pdfname = paste0(resDir, "/Select_pan.neurons_by_compare_otherSamples_",  version.analysis, ".pdf")
-  pdf(pdfname, width=12, height = 8)
-  par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  
-  source("miRNAseq_functions.R")
-  Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
-  
-  dev.off()
-}
-
 cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
 cpm.piRNA.bc.meanrep.log2 = average.biological.replicates(log2(cpm.piRNA.bc))
 
-mm = match(c("lsy-6", "mir-791", "mir-790"), rownames(cpm.piRNA.bc))
+Test.which.Pan.neurons.to.use.check.individual.examples = FALSE
+if(Test.which.Pan.neurons.to.use){
+  pdfname = paste0(resDir, "/Select_panNeurons_Samples_check_examples_",  version.analysis, ".pdf")
+  pdf(pdfname, width=12, height = 6)
+  par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
+  source("miRNAseq_functions.R")
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix)
+  
+  #source("miRNAseq_functions.R")
+  #cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))]
+  #log2(cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))])
+  
+  #(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
+  #log2(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
+  #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
+  #Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
+  
+  dev.off()
+  
+}
 
-cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))]
-log2(cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))])
-
-(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
-log2(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
-(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
-
-
-save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, design.matrix, 
+save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, cpm.piRNA.bc.meanrep.log2,
+     design.matrix, 
      file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
 ### test if normalization and batch removal works
 #cpm.piRNA.batch.corrected[which(rownames(cpm.piRNA.batch.corrected)=='lsy-6'), grep('treated', colnames(cpm.piRNA.batch.corrected))]
