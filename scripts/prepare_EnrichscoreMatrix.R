@@ -7,20 +7,11 @@
 ## Date of creation: Tue May 15 17:50:26 2018
 ##################################################
 ##################################################
-find.neuronSamples.names = function(x)
-{
-  return(unlist(strsplit(as.character(x), "/"))[5])
-}
-find.neuronSamples.promoters = function(x)
-{
-  filename = unlist(strsplit(as.character(x), "/"))
-  return(unlist(strsplit(filename[length(filename)], "_"))[6])
-}
 
-dataDir = "../results/miRNAs_neurons_v1_2018_03_07/tables"
+dataDir = "../results/miRNAs_neurons_enrichment/tables"
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 
-version.analysis = "20180506"
+version.analysis = "20181203"
 Save.Processed.Tables = FALSE
 
 resDir = "../results/tables_for_decomvolution"
@@ -34,12 +25,14 @@ if(!dir.exists(RdataDir)) dir.create(RdataDir)
 # the cutoff should be considered and specified
 ##################################################
 ##################################################
-enrich.files = list.files(path = dataDir, pattern = paste0("*_Mature_miRNAs_neurons_v1_2018_03_07.csv"), full.names = TRUE, recursive = TRUE, include.dirs = TRUE)
-jj = grep("ASE.neurons_henn1.mutant", enrich.files)
-enrich.files = enrich.files[-jj]
+enrich.files = list.files(path = dataDir, pattern = paste0("*_Mature_miRNAs_neurons_v1_2018_03_07.csv"), full.names = TRUE, 
+                          recursive = TRUE, include.dirs = TRUE)
+#jj = grep("ASE.neurons_henn1.mutant", enrich.files)
+#enrich.files = enrich.files[-jj]
 
-nsamples = sapply(enrich.files, find.neuronSamples.names, USE.NAMES = FALSE)
-promoters = sapply(enrich.files, find.neuronSamples.promoters, USE.NAMES = FALSE)
+nsamples = unlist(sapply(enrich.files, function(x) unlist(strsplit(basename(x), "_"))[4]))
+genotypes = unlist(sapply(enrich.files, function(x) unlist(strsplit(basename(x), "_"))[5]))
+promoters = unlist(sapply(enrich.files, function(x) unlist(strsplit(basename(x), "_"))[6]))
 
 ####################
 ## Construct the matrix using all samples (three promoters for pan-neurons (all henn1-mutant) and one ASE (WT) 
@@ -55,7 +48,7 @@ for(n in 1:length(enrich.files))
     mm = match(rownames(enrich.matrix), rownames(test))
     enrich.matrix = data.frame(enrich.matrix, test$log2FoldChange[mm], test$pvalue[mm])
   }
-  colnames(enrich.matrix)[c((2*n-1),2*n)] = paste0(nsamples[n], "_", promoters[n], "_", c('log2FC', 'pvalue'))
+  colnames(enrich.matrix)[c((2*n-1),2*n)] = paste0(nsamples[n], "_", genotypes[n], "_",  promoters[n], "_", c('log2FC', 'pvalue'))
 }
 
 ## determine candidates of interest 
@@ -98,7 +91,7 @@ enrich.matrix.sel = t(enrich.matrix[which(candidates>0), grep('_log2FC', colname
 library("pheatmap")
 library("RColorBrewer")
 
-pdfname = paste0(resDir, "/heatmap_for_13samples_66genes_with_clusters_for_neuronClasses", ".pdf")
+pdfname = paste0(resDir, "/heatmap_for_13samples_66genes_with_clusters_for_neuronClasses", version.analysis, ".pdf")
 pdf(pdfname, width=16, height = 6)
 par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
 par(mfrow=c(1, 1))
@@ -116,7 +109,7 @@ if(Save.Processed.Tables)
        file = paste0(RdataDir, "Enrichscores_Matrix_13samples_selected_and_all_genes_", version.analysis, ".Rdata"))
   write.table(enrich.matrix.sel, file = paste0(resDir, "/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
-  write.table(enrich.matrix, file = paste0(resDir, "/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses.txt"), 
+  write.table(enrich.matrix, file = paste0(resDir, "/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses_", version.analysis, ".txt"), 
               sep = "\t", col.names = TRUE, row.names = TRUE, quote = FALSE)
 }
 

@@ -25,7 +25,7 @@ This reprosition is for the deconvolution analysis for Chiara's project
         others )
       - functions.miRNASummarize.no.fixation.R (pool different 5' or isoforms) 
       - total different R function in nextflow pipeline (suppose to give same results as functions.miRNASummarize.no.fixation.R)
-    - at the end my own function was coded and the conclusion for this step is that the size.factors calcluated from piRNA count table is the very similar to piRNA library size.   
+    - at the end my own function was coded and the conclusion for this step is that the size.factors calcluated from piRNA count table is the very similar to piRNA library size.
     
   - [x] Double check the batch correction works 
     - The batch correction works more or less; but the the batch correction for rab-3 is much improved but still not perfect, in spit of limma or combat batch correction.   
@@ -35,7 +35,9 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
   
   - [ ] Improve the model fitting, especially for known examples, lsy-6 
-    - [ ] recheck the linear model, especailly the intercept for the background; perhaps we can consider promoter-specific background, which take into count the           miRNAs in the background compositions and also the promoter mythelation efficiencies.
+    
+    - [ ] recheck the linear model, especailly the intercept for the background; perhaps we can consider promoter-specific background, which take into count the           miRNAs in the background compositions and also the promoter mythelation efficiencies.  
+          - after batch correction, use non-enriched miRNAs to calibrate the background (background calibration)
     
     - [ ] Integrate the sample qualities or sample variance into into the linear model ??
     - [ ] post-filtering (i.e. removing non-significant ones)

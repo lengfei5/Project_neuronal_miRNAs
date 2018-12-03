@@ -278,13 +278,32 @@ Test.piRNA.normalization.batch.removal(cpm.piRNA.bc.combat, design.matrix)
 
 dev.off()
 
-####################
-## Here we decided to use the piRNA normalization and correct the batch using ComBat 
-####################
 ## average the biological replicates
 source("miRNAseq_functions.R")
 cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
 cpm.piRNA.bc.meanrep.log2 = average.biological.replicates(log2(cpm.piRNA.bc))
+
+save(cpm.piRNA.bc, 
+     cpm.piRNA.bc.meanrep, 
+     cpm.piRNA.bc.meanrep.log2,
+     design.matrix, 
+     file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
+
+
+########################################################
+########################################################
+# Section : calibrate the background
+# 
+########################################################
+########################################################
+
+####################
+## Here we decided to use the piRNA normalization and correct the batch using ComBat 
+####################
+
+### test if normalization and batch removal works
+#cpm.piRNA.batch.corrected[which(rownames(cpm.piRNA.batch.corrected)=='lsy-6'), grep('treated', colnames(cpm.piRNA.batch.corrected))]
+
 
 Test.which.Pan.neurons.to.use.check.individual.examples = FALSE
 if(Test.which.Pan.neurons.to.use){
@@ -295,12 +314,10 @@ if(Test.which.Pan.neurons.to.use){
   source("miRNAseq_functions.R")
   Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix)
   
-  #source("miRNAseq_functions.R")
-  #cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))]
-  #log2(cpm.piRNA.bc[mm, grep("_treated", colnames(cpm.piRNA.bc))])
+  source("miRNAseq_functions.R")
+  calibrate.background.across.promoters(cpm.piRNA.bc, design.matrix)
   
-  #(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
-  #log2(cpm.piRNA.bc.meanrep[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep))])
+  
   #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
   #Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
   
@@ -308,11 +325,7 @@ if(Test.which.Pan.neurons.to.use){
   
 }
 
-save(cpm.piRNA.bc, cpm.piRNA.bc.meanrep, cpm.piRNA.bc.meanrep.log2,
-     design.matrix, 
-     file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
-### test if normalization and batch removal works
-#cpm.piRNA.batch.corrected[which(rownames(cpm.piRNA.batch.corrected)=='lsy-6'), grep('treated', colnames(cpm.piRNA.batch.corrected))]
+
 
 ######################################
 ######################################

@@ -1398,14 +1398,21 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     abline(h=c((ns.mean[1]-1), (ns.mean[1]+1)), lwd=1.0, col='red', lty=2)
     
   }
+}
+
+calibrate.background.across.promoters = function(cpm, design.matrix)
+{
+  # cpm = log2(cpm.piRNA.bc);
   
   ##########################################
   # check if the promoter-specific backgrounds 
   ##########################################
-  kk = match(rownames(cpm), enriched.list)
+  #kk = match(rownames(cpm), enriched.list)
+  #kk = c(1:nrow(cpm))
   #kk = which(is.na(kk))
-  bgs = cpm[which(is.na(kk)), ]
+  #bgs = cpm[which(is.na(kk)), ]
   #xx = bgs
+  bgs = cpm;
   #xx = average.biological.replicates.for.promoters(bgs)
   jj = which(design.matrix$treatment == "treated")
   
@@ -1420,17 +1427,15 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
   }
   colnames(yy) = prots.uniq
   
-  #xx = data.frame(apply(xx[, jj], 1, median), xx[, -jj])
-  #ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
-  #ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
-  #colnames(xx) = c('whole.body', 'background', ncs)
-  #xx = xx[, -c(1)]
-  #for(n in 2:ncol(xx)) xx[,n] = xx[,n] - xx[, 1]
-  
+  require(MASS)
   intercepts = c()
-  jj = which(apply(yy, 1, mean)<5)
+  enriched =  read.table(file = paste0("../results/tables_for_decomvolution", 
+                                       "/tables/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses_20181203.txt"), 
+                         sep = "\t", header = TRUE, row.names = 1)
+  #jj = which(apply(yy, 1, mean)<5 & apply(yy, 1, mean)>-2)
   for(n in 1:ncol(yy)){
-    intercepts = c(intercepts, mean(yy[jj,n] - yy[jj,1]))
+    rfit = rlm((yy[jj,n] - yy[jj, 1]) ~ 1 )
+    intercepts = c(intercepts, rfit$coefficients)
   }
   names(intercepts) = colnames(yy)
   
@@ -1452,8 +1457,6 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
   ##########################################
   # check the variance for each promoter 
   ##########################################
-  
-  
 }
 
 
