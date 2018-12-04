@@ -1174,7 +1174,7 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     cat("-- using piRNA size factors \n")
     sizefactors = as.numeric(piRNA.sizeFctors)
   }
- 
+  
   cpm.piRNA = countData;
   for(n in 1:ncol(cpm.piRNA)) cpm.piRNA[,n] = cpm.piRNA[,n]/sizefactors[n]*10^6
   
@@ -1347,7 +1347,6 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
          pos = 1, offset = 0.4)
     
-    
   }
   
   ##########################################
@@ -1402,40 +1401,71 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
 
 calibrate.background.across.promoters = function(cpm, design.matrix)
 {
-  # cpm = log2(cpm.piRNA.bc);
-  
-  ##########################################
-  # check if the promoter-specific backgrounds 
-  ##########################################
-  #kk = match(rownames(cpm), enriched.list)
-  #kk = c(1:nrow(cpm))
-  #kk = which(is.na(kk))
-  #bgs = cpm[which(is.na(kk)), ]
-  #xx = bgs
-  bgs = cpm;
-  #xx = average.biological.replicates.for.promoters(bgs)
-  jj = which(design.matrix$treatment == "treated")
-  
-  design.bgs = design.matrix[jj, ]
-  xx = bgs[, jj]
-  prots = paste0(design.bgs$tissue.cell, "_", design.bgs$promoter)
-  prots.uniq = unique(prots)
-  
-  yy = c()
-  for(n in 1:length(prots.uniq)) {
-    yy = cbind(yy, apply(xx[, which(prots == prots.uniq[n])], 1, median))
-  }
-  colnames(yy) = prots.uniq
-  
-  require(MASS)
-  intercepts = c()
+  # cpm = cpm.piRNA.bc 
+  cpm = log2(cpm);
   enriched =  read.table(file = paste0("../results/tables_for_decomvolution", 
                                        "/tables/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses_20181203.txt"), 
                          sep = "\t", header = TRUE, row.names = 1)
+  
+  enriched.list = read.table(file = paste0("../results/tables_for_decomvolution",
+                                           "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
+                             sep = "\t", header = TRUE, row.names = 1)
+  enriched.list = colnames(enriched.list)
+  enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
+  
+  ##########################################
+  # start the background calibration for the promoter-specific backgrounds 
+  ##########################################
+  jj = which(design.matrix$treatment == "treated")
+  treated = cpm[, jj];
+  untreated = cpm[, -jj];
+  #treated.mean = average.biological.replicates.for.promoters(treated)
+  design.treated = design.matrix[jj, ]
+  
+  prots = paste0(design.treated$tissue.cell, "_", design.treated$promoter)
+  prots.uniq = unique(prots)
+  
+  design.treated$prots = prots
+  yy = c()
+  for(n in 1:length(prots.uniq)) {
+    yy = cbind(yy, apply(treated[, which(prots == prots.uniq[n])], 1, median))
+  }
+  colnames(yy) = prots.uniq
+  
+  ##########################################
+  # here a careful selection of non-enriched miRNAs were selected with the aim of having as many as possible
+  # and also outlier should be removed for the sake of robustness
+  ##########################################
+  require(MASS)
+  intercepts = c(0, rep(NA), (length(yy)-1))
+  
+  mm = match(rownames(yy), enriched.list)
+  #sels = find.non.enriched.miRNAs(neurons, enrich.matrix, fc.cutoff = 1, pval.cutoff = 0.01)
+  #head(enrich.matrix[match(sels, rownames(enrich.matrix)), ])
+  jj = which(is.na(mm))
+  
   #jj = which(apply(yy, 1, mean)<5 & apply(yy, 1, mean)>-2)
-  for(n in 1:ncol(yy)){
-    rfit = rlm((yy[jj,n] - yy[jj, 1]) ~ 1 )
-    intercepts = c(intercepts, rfit$coefficients)
+  par(mfrow=c(1, 5))
+  for(n in 2:ncol(yy)){
+    
+    neurons = unlist(strsplit(as.character(colnames(yy)[n]), "_"))[1]
+    
+    rrs = yy[jj,n] - yy[jj,1]
+    upper = quantile(rrs, 0.85, names = FALSE)
+    lower = quantile(rrs, 0.15, names = FALSE)
+    jj.middle = jj[intersect(which(rrs > lower), which(rrs < upper))]
+    
+    rfit = rlm((yy[jj.middle,n] - yy[jj.middle, 1]) ~ 1 )
+    intercepts[n] = rfit$coefficients
+    
+    cat(median(rrs[which(rrs>lower & rrs< upper)]), " -- ",  intercepts[n], "\n")
+    plot(yy[jj.middle, 1], yy[jj.middle, n], ylab = paste0('bg -', neurons), xlab = "background in N2" )
+    abline(intercepts[n], 1, col = 'red', lwd=2.0)
+    
+    
+    kk = which(design.treated$prots == colnames(yy)[n])
+    for(k in kk) treated[, k] = treated[,k] - intercepts[n];
+    
   }
   names(intercepts) = colnames(yy)
   
@@ -1444,22 +1474,43 @@ calibrate.background.across.promoters = function(cpm, design.matrix)
                      "_miRNAs_neurons_20180525", ".Rdata"))
   nbcells = apply(as.matrix(newprop), 1, sum)
   nbcells = c(0.5,  2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
+  
+  par(mfrow=c(1, 1))
   plot(nbcells, intercepts, log='x')
   text(nbcells, intercepts, names(intercepts), pos=1, cex = 0.6, offset = 0.2)
+  abline(h = c(-1, 0, 1), col = 'red', lwd=2.0)
   
-  # matplot(t(yy))
-  #plot(yy[, c(1,4)]);abline(0, 1, lwd=1.0, col = 'red')
-  #plot(yy[, c(1,8)]);abline(0, 1, lwd=1.0, col = 'red')
-  #plot(yy[, c(1,7)]);abline(0, 1, lwd=1.0, col = 'red')
-  #plot(yy[, c(1,10)]);abline(0, 1, lwd=1.0, col = 'red')
-  #plot(yy[, c(1,11)]);abline(0, 1, lwd=1.0, col = 'red')
-  #plot(yy[, c(1,2)]);abline(0, 1, lwd=1.0, col = 'red')
-  ##########################################
-  # check the variance for each promoter 
-  ##########################################
+  #cpm.piRNA.bc.bgc = data.frame(untreated, treated, stringsAsFactors = FALSE)
+  cpm.piRNA.bc.bgc = cbind(untreated, treated)
+  cpm.piRNA.bc.bgc = cpm.piRNA.bc.bgc[, match(colnames(cpm), colnames(cpm.piRNA.bc.bgc))]
+  
+  return(cpm.piRNA.bc.bgc)
+  
+  
 }
 
-
+find.non.enriched.miRNAs = function(neurons, enrich.matrix, fc.cutoff = 0, pval.cutoff = 0.05)
+{
+  ggs = c()
+  sels = grep(neurons, colnames(enrich.matrix))
+  if(length(sels)==0) sels = grep(gsub("-", ".", neurons), colnames(enrich.matrix))
+  for(n in 1:nrow(enrich.matrix)){
+    #deleted = rep(FALSE, length(sels))
+    index.pval = sels[grep("_pvalue", colnames(enrich.matrix)[sels])]
+    index.fc = sels[grep("_log2FC", colnames(enrich.matrix)[sels])]
+    if(all(!is.na(enrich.matrix[n, sels]))){
+      if(all(enrich.matrix[n, index.fc]<fc.cutoff) && enrich.matrix[n, index.pval]> pval.cutoff) ggs = c(ggs, rownames(enrich.matrix)[n])
+    }
+    #for(m in 1:length(sels))
+    #{
+    #  if(grep("_log2FC", colnames(yy)[sels[m]])){
+    #    if(enrich.matrix[n, m]<0) deleted
+    #  } 
+    #}
+  }
+  
+  return(ggs)
+}
 
 
 

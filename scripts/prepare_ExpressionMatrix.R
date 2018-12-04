@@ -19,6 +19,7 @@ Save.Processed.Tables = TRUE
 version.analysis = "neuronal_miRNAs_20181128"
 
 calculate.sizeFactors.for.piRNAs = FALSE
+keep.all.mature.miRNAs.for.processing = TRUE
 
 ######################################
 ######################################
@@ -56,13 +57,6 @@ if(Merge.techinical.replicates.N2){
   }
 } 
 
-# filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
-if(Filter.lowly.expressed.using.predefined.miRNA.list){
-  list.expressed = read.csv(paste0("../data/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
-  # prepare old llist
-  list.expressed = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
-  expressed.miRNAs = data.frame(list.expressed[, c(1:3)], stringsAsFactors = FALSE)
-}
 
 ####################
 ## calculate cpm and select only expressed miRNAs and start to use the gene names instead of arms 
@@ -73,10 +67,27 @@ library.sizes = apply(raw, 2, sum)
 raw = floor(raw)
 rownames(raw) = all$gene
 
-expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
-mm = match(expressed.miRNAs$miRNA, all$gene)
-raw = raw[mm, ]
-rownames(raw) = expressed.miRNAs$gene
+if(keep.all.mature.miRNAs.for.processing){
+  
+  ## filter mir star and also the genes with low counts
+  
+  
+}else{
+  
+  # filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
+  if(Filter.lowly.expressed.using.predefined.miRNA.list){
+    list.expressed = read.csv(paste0("../data/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
+    # prepare old llist
+    list.expressed = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
+    expressed.miRNAs = data.frame(list.expressed[, c(1:3)], stringsAsFactors = FALSE)
+  }
+  
+  expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
+  mm = match(expressed.miRNAs$miRNA, all$gene)
+  raw = raw[mm, ]
+  rownames(raw) = expressed.miRNAs$gene
+  
+}
 
 ###############################
 # filter the samples unrelevant (non-neuron samples, henn1-mutant background)
@@ -293,34 +304,37 @@ save(cpm.piRNA.bc,
 ########################################################
 ########################################################
 # Section : calibrate the background
-# 
+# after piRNA normalization and bacth correction using untreated samples
+# The background for treated samples of differetn promoters are different (the assumption)
+# we are using the non-enriched miRNAs to correct this bias, which are resulted from the background composition, promoter mythelation efficiencies.
+# hopefully this will not change too much our initial data and the background correction will be roughly proprotional to the sample sizes
 ########################################################
 ########################################################
-
+load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
 ####################
 ## Here we decided to use the piRNA normalization and correct the batch using ComBat 
 ####################
-
-### test if normalization and batch removal works
-#cpm.piRNA.batch.corrected[which(rownames(cpm.piRNA.batch.corrected)=='lsy-6'), grep('treated', colnames(cpm.piRNA.batch.corrected))]
-
-
 Test.which.Pan.neurons.to.use.check.individual.examples = FALSE
 if(Test.which.Pan.neurons.to.use){
-  pdfname = paste0(resDir, "/Select_panNeurons_Samples_check_examples_",  version.analysis, ".pdf")
+  pdfname = paste0(resDir, "/Select_panNeurons_BEFORE_background_calibration_Samples_check_examples_",  version.analysis, ".pdf")
   pdf(pdfname, width=12, height = 6)
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   source("miRNAseq_functions.R")
   Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix)
   
+  dev.off()
+  
+  pdfname = paste0(resDir, "/Select_panNeurons_AFTER_background_calibration_Samples_check_examples_",  version.analysis, ".pdf")
+  pdf(pdfname, width=12, height = 6)
+  par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+  
   source("miRNAseq_functions.R")
-  calibrate.background.across.promoters(cpm.piRNA.bc, design.matrix)
-  
-  
+  xx = calibrate.background.across.promoters(cpm.piRNA.bc, design.matrix)
+  yy = 2^xx
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(yy, design.matrix)
   #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
   #Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
-  
   dev.off()
   
 }

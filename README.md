@@ -38,7 +38,7 @@ This reprosition is for the deconvolution analysis for Chiara's project
     
     - [ ] recheck the linear model, especailly the intercept for the background; perhaps we can consider promoter-specific background, which take into count the           miRNAs in the background compositions and also the promoter mythelation efficiencies.  
           - after batch correction, use non-enriched miRNAs to calibrate the background (background calibration)
-    
+          - to have robust estimation, all miRNAs (including the ones not passing expressing thresholds) (have a try)
     - [ ] Integrate the sample qualities or sample variance into into the linear model ??
     - [ ] post-filtering (i.e. removing non-significant ones)
   
