@@ -473,6 +473,8 @@ find.expressed.mature.miRNA.using.cpm.threshold = function(countData, cpm.thresh
   }else{
     mean.cpm = cpm;
   }
+  hist(log2(mean.cpm), breaks = 40)
+  abline(v= log2(cpm.threshold), lwd=2.0, col='blue')
   gene.expressed = unique(ggs[which(mean.cpm > cpm.threshold)])
   
   #cpm.untreated = cpm[, which(dds$treatment=="untreated")]
@@ -1294,7 +1296,7 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
 {
   #cpm.piRNA.bc.meanrep.log2 = log2(cpm.piRNA.bc)
   
-  selections = c("all", "rab-3", "rgef-1")
+  selections = c("all")
   # sel = "all"
   for(sel in selections)
   {
@@ -1352,11 +1354,15 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
   ##########################################
   # check lsy-6 and other examples
   ##########################################
-  examples = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124", "mir-1", "mir-243", "lin-4")
+  examples = c("lsy-6", "mir-791", "mir-793",  "mir-792",
+               "mir-1821", "mir-83", "mir-124", "mir-1", 
+               "mir-243", "lin-4", "mir-249", "mir-789-2",
+               "mir-1830", "mir-392", "mir-238", "mir-254",
+               "mir-245", "mir-34", "mir-794", "mir-1020")
   #kk = match(examples, rownames(cpm.piRNA.bc)
   ns = unique(design.matrix$tissue.cell)
   cpm = log2(cpm.piRNA.bc)
-  par(mfrow=c(1, 2))
+  par(mfrow=c(2, 2))
   for(gg in examples)
   {
     #gg = "lsy-6"
@@ -1379,10 +1385,11 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
       # add sample ids 
       if(ns[n]=="Pan.neurons"){
         text(rep(n, length(index.ns)), cpm[kk, index.ns], design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
+        abline(h = median(cpm[kk, index.ns]), lwd=1.5, col = 'darkblue')
       }
-      
       index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
       points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1., pch = 0)
+      
     }
     points(c(1:length(ns)), ns.mean, type = "l", cex=1.0, col = 'darkgreen')
     points(c(1:length(ns)), ns.mean, type = "p", cex=1.0, col = 'darkgreen')
@@ -1445,15 +1452,17 @@ calibrate.background.across.promoters = function(cpm, design.matrix)
   jj = which(is.na(mm))
   
   #jj = which(apply(yy, 1, mean)<5 & apply(yy, 1, mean)>-2)
-  par(mfrow=c(1, 5))
+  par(mfrow=c(3, 5))
   for(n in 2:ncol(yy)){
     
     neurons = unlist(strsplit(as.character(colnames(yy)[n]), "_"))[1]
     
     rrs = yy[jj,n] - yy[jj,1]
-    upper = quantile(rrs, 0.85, names = FALSE)
-    lower = quantile(rrs, 0.15, names = FALSE)
-    jj.middle = jj[intersect(which(rrs > lower), which(rrs < upper))]
+    #upper = quantile(rrs, 0.60, names = FALSE); lower = quantile(rrs, 0.10, names = FALSE)
+    upper = 1; lower = quantile(rrs, 0.15, names = FALSE)
+    #upper = max(rrs); lower = min(rrs);
+    
+    jj.middle = jj[intersect(which(rrs >= lower), which(rrs <= upper))]
     
     rfit = rlm((yy[jj.middle,n] - yy[jj.middle, 1]) ~ 1 )
     intercepts[n] = rfit$coefficients
@@ -1473,7 +1482,7 @@ calibrate.background.across.promoters = function(cpm, design.matrix)
                      "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix_plus_mergedFractionMatrix", 
                      "_miRNAs_neurons_20180525", ".Rdata"))
   nbcells = apply(as.matrix(newprop), 1, sum)
-  nbcells = c(0.5,  2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
+  nbcells = c(558,  2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
   
   par(mfrow=c(1, 1))
   plot(nbcells, intercepts, log='x')
@@ -1485,7 +1494,6 @@ calibrate.background.across.promoters = function(cpm, design.matrix)
   cpm.piRNA.bc.bgc = cpm.piRNA.bc.bgc[, match(colnames(cpm), colnames(cpm.piRNA.bc.bgc))]
   
   return(cpm.piRNA.bc.bgc)
-  
   
 }
 

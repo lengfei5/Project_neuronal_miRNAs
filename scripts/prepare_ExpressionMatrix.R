@@ -19,7 +19,8 @@ Save.Processed.Tables = TRUE
 version.analysis = "neuronal_miRNAs_20181128"
 
 calculate.sizeFactors.for.piRNAs = FALSE
-keep.all.mature.miRNAs.for.processing = TRUE
+Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
+
 
 ######################################
 ######################################
@@ -29,7 +30,6 @@ keep.all.mature.miRNAs.for.processing = TRUE
 load(file = paste0('../results/miRNAs_neurons_enrichment/Rdata/Design_Raw_readCounts_', version.table, '.Rdata'))
 source("miRNAseq_functions.R")
 
-Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
 Merge.techinical.replicates.N2 = TRUE
 
 tcs = unique(design$tissue.cell)
@@ -67,27 +67,25 @@ library.sizes = apply(raw, 2, sum)
 raw = floor(raw)
 rownames(raw) = all$gene
 
-if(keep.all.mature.miRNAs.for.processing){
-  
+if(Filter.lowly.expressed.using.predefined.miRNA.list){
   ## filter mir star and also the genes with low counts
-  
+  source("miRNAseq_functions.R")
+  expressed.miRNAs =  find.expressed.mature.miRNA.using.cpm.threshold(raw[, which(design$treatment == "untreated")], 
+                                                                      cpm.threshold = 0.1)
+  expressed.miRNAs = data.frame(expressed.miRNAs[, c(1:3)], stringsAsFactors = FALSE)
   
 }else{
-  
   # filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
-  if(Filter.lowly.expressed.using.predefined.miRNA.list){
-    list.expressed = read.csv(paste0("../data/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
-    # prepare old llist
-    list.expressed = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
-    expressed.miRNAs = data.frame(list.expressed[, c(1:3)], stringsAsFactors = FALSE)
-  }
-  
-  expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
-  mm = match(expressed.miRNAs$miRNA, all$gene)
-  raw = raw[mm, ]
-  rownames(raw) = expressed.miRNAs$gene
+  list.expressed = read.csv(paste0("../data/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), header = TRUE, as.is = c(1, 2))
+  # prepare old llist
+  list.expressed = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
+  expressed.miRNAs = data.frame(list.expressed[, c(1:3)], stringsAsFactors = FALSE)
   
 }
+expressed.miRNAs = expressed.miRNAs[expressed.miRNAs$mature,]
+mm = match(expressed.miRNAs$miRNA, all$gene)
+raw = raw[mm, ]
+rownames(raw) = expressed.miRNAs$gene
 
 ###############################
 # filter the samples unrelevant (non-neuron samples, henn1-mutant background)
@@ -317,7 +315,7 @@ load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAv
 Test.which.Pan.neurons.to.use.check.individual.examples = FALSE
 if(Test.which.Pan.neurons.to.use){
   pdfname = paste0(resDir, "/Select_panNeurons_BEFORE_background_calibration_Samples_check_examples_",  version.analysis, ".pdf")
-  pdf(pdfname, width=12, height = 6)
+  pdf(pdfname, width=12, height = 12)
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   source("miRNAseq_functions.R")
