@@ -1406,7 +1406,7 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
   }
 }
 
-calibrate.background.across.promoters = function(cpm, design.matrix)
+calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
 {
   # cpm = cpm.piRNA.bc 
   cpm = log2(cpm);

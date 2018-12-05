@@ -328,7 +328,7 @@ if(Test.which.Pan.neurons.to.use){
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   source("miRNAseq_functions.R")
-  xx = calibrate.background.across.promoters(cpm.piRNA.bc, design.matrix)
+  xx = calibrate.promoter.methylation.efficiency(cpm.piRNA.bc, design.matrix)
   yy = 2^xx
   Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(yy, design.matrix)
   #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
