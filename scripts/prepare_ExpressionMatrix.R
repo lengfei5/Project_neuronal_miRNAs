@@ -21,7 +21,6 @@ version.analysis = "neuronal_miRNAs_20181128"
 calculate.sizeFactors.for.piRNAs = FALSE
 Filter.lowly.expressed.using.predefined.miRNA.list = TRUE;
 
-
 ######################################
 ######################################
 ## Section: load count tables for miRNAs and prepare statistics for piRNA and siRNAs for normalization
@@ -301,7 +300,7 @@ save(cpm.piRNA.bc,
 
 ########################################################
 ########################################################
-# Section : calibrate the background
+# Section : calibrate promoter methylation efficiencies
 # after piRNA normalization and bacth correction using untreated samples
 # The background for treated samples of differetn promoters are different (the assumption)
 # we are using the non-enriched miRNAs to correct this bias, which are resulted from the background composition, promoter mythelation efficiencies.
@@ -312,8 +311,8 @@ load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAv
 ####################
 ## Here we decided to use the piRNA normalization and correct the batch using ComBat 
 ####################
-Test.which.Pan.neurons.to.use.check.individual.examples = FALSE
-if(Test.which.Pan.neurons.to.use){
+Try.Calibrate.promoter.methylation.efficiency = TRUE
+if(Try.Calibrate.promoter.methylation.efficiency){
   pdfname = paste0(resDir, "/Select_panNeurons_BEFORE_background_calibration_Samples_check_examples_",  version.analysis, ".pdf")
   pdf(pdfname, width=12, height = 12)
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -336,8 +335,6 @@ if(Test.which.Pan.neurons.to.use){
   dev.off()
   
 }
-
-
 
 ######################################
 ######################################

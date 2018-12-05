@@ -1319,10 +1319,6 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     expression = xx[, -c(1:2)]
     for(n in 1:ncol(expression)) expression[,n] = expression[,n] - xx$background
     
-    #expression = xx[, -c(1:2)]
-    #for(n in 1:ncol(expression)) expression[,n] = expression[,n]/xx$background
-    #expression = cpm.piRNA.bc.meanrep[, setdiff(kk, index.N2)] - cpm.piRNA.bc.meanrep[, index.N2]   
-    #expression[which(expression<0)] = 0
     enriched.list = read.table(file = paste0(resDir, "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
                                sep = "\t", header = TRUE, row.names = 1)
     enriched.list = colnames(enriched.list)
@@ -1334,23 +1330,31 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     
     ## double check the expression matrix
     par(mfrow = c(1, 1))
-    yy = expression.sel
-    yy[yy<0] = 0
-    mm = match(c("cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
-    #ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
-    
-    plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
-         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = c(-1, 10), ylim = c(-1, 25))
-    abline(0, 1, col="red", lwd=2.0)
-    abline(0.5, 1, col="red", lwd=1.0, lty = 2)
-    abline(-0.5, 1, col="red", lwd=1.0, lty =2)
-    abline(1, 1, col="red", lwd=1.0, lty=3)
-    abline(-1, 1, col="red", lwd=1.0, lty=3)
-    text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
-         pos = 1, offset = 0.4)
-    
+    for(mm in c(0, 1)){
+      if(mm == 0) {
+        yy = expression.sel;
+        sel = paste0("all -- keep negative values below background")
+      }else{
+        yy = expression.sel;
+        yy[yy<0] = 0
+        sel = paste0("all -- convert zeros for negative values below background")
+      }
+     
+      mm = match(c("cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
+      #ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
+      
+      plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+           ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = c(-1, 10), ylim = c(-1, 25))
+      abline(0, 1, col="red", lwd=2.0)
+      abline(0.5, 1, col="red", lwd=1.0, lty = 2)
+      abline(-0.5, 1, col="red", lwd=1.0, lty =2)
+      abline(1, 1, col="red", lwd=1.0, lty=3)
+      abline(-1, 1, col="red", lwd=1.0, lty=3)
+      text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
+           pos = 1, offset = 0.4)
+      
+    }
   }
-  
   ##########################################
   # check lsy-6 and other examples
   ##########################################
@@ -1369,23 +1373,28 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
     kk = which(rownames(cpm)==gg)
-    lims = range(cpm[kk, ])
+    index.bg = which(design.matrix$tissue.cell == "whole.body" & design.matrix$treatment=="treated");
+    bg.mean = median(cpm[kk, index.bg]);
+    ns = setdiff(ns, "whole.body")
+    ns.mean = c()
+    
+    lims = range(cpm[kk, ] - bg.mean)
     plot(c(1:length(ns)), rep(1, length(ns)), type= 'n', col='darkblue', cex=1.0, log='', ylim =lims, main = paste0(gg), xlab=NA, 
          ylab = 'normalizaed by piRNAs', axe = FALSE)
     #points(c(1:length(ns)), tcs[kk, ], type = "b", cex=1.0, col = 'darkblue')
     #points(c(1:length(ns)), total[kk, ], type= 'l', col='black', cex=1.0)
     #points(c(1:length(ns)), total[kk, ], type= 'b', col= "black", cex= 1.0)
     
-    ns.mean = c()
+    
     for(n in 1:length(ns))
     {
       index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")
-      points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='darkblue', cex=1., pch =16)
-      ns.mean = c(ns.mean, median(cpm[kk, index.ns]))
+      points(rep(n, length(index.ns)), (cpm[kk, index.ns] - bg.mean), type = "p", col='darkblue', cex=1., pch =16)
+      ns.mean = c(ns.mean, median(cpm[kk, index.ns] - bg.mean))
       # add sample ids 
       if(ns[n]=="Pan.neurons"){
-        text(rep(n, length(index.ns)), cpm[kk, index.ns], design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
-        abline(h = median(cpm[kk, index.ns]), lwd=1.5, col = 'darkblue')
+        text(rep(n, length(index.ns)), (cpm[kk, index.ns] - bg.mean), design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
+        abline(h = median((cpm[kk, index.ns] - bg.mean)), lwd=1.5, col = 'darkblue')
       }
       index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
       points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1., pch = 0)
@@ -1400,8 +1409,8 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
     box()
     #abline(h=c(0, 2, 5), lwd=0.7, col='red')
-    abline(h=c(ns.mean[1]), lwd=1.0, col='red')
-    abline(h=c((ns.mean[1]-1), (ns.mean[1]+1)), lwd=1.0, col='red', lty=2)
+    abline(h=0, lwd=2.0, col='darkgray')
+    abline(h=c(-1, 1), lwd=1.5, col='darkgray', lty=2)
     
   }
 }
