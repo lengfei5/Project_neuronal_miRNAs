@@ -29,7 +29,7 @@ version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
 
-version.analysis = "_20181126"
+version.analysis = "_20181214"
 
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 resDir = "../results/decomvolution_results/"
@@ -113,8 +113,9 @@ if(Use.mergedFractionMatrix){
 ######################################
 if(!Use.mergedExpressionMatrix){
   
-  load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
-  cpm.piRNA.bc = log2(cpm.piRNA.bc)
+  #load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
+  load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNAnorm_batchCorrectedCombat_calibratedProtEff_', version.ExprsMatrix, '.Rdata'))
+  cpm.piRNA.bc = log2(cpm.piRNA.bc.prot)
   cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
   
   jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
@@ -258,7 +259,7 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
 # the glmnet will be run for each gene, because the group lasso is not desirable
 ######################################
 ######################################
-x=as.matrix(proportions.sel)
+x = as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
 
 ## force value to be zero if they are lower than the background
@@ -268,7 +269,7 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   
   x = x >0
   Example2test = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
-  #Example2test = c("lsy-6", "mir-791", "mir-793")
+  #Example2test = c(Example2test, setdiff(colnames(y), Example2test))
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
   
@@ -297,11 +298,9 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
-########################################################
-########################################################
-# Section: glmnet with global alpha parameter or gene-specific alpha parameters
-########################################################
-########################################################
+##########################################
+# glmnet with global alpha parameter or gene-specific alpha parameters
+##########################################
 require(glmnet)
 library("pheatmap")
 library("RColorBrewer")
@@ -309,32 +308,38 @@ TEST.glmnet.gene.specific.alpha = FALSE
 save.optimal.results.for.downstream.analysis = TRUE
 
 #Methods2test = c("cv.lambda.1se", "bic", "aic", "aicc")
-Methods2test = c("cv.lambda.1se")
-
-alphas = c(seq(0.4, 1, by= 0.05))
+Methods2test = c("cv.lambda.1se", "bic")
+Methods2test = c("bic")
+alphas = c(seq(0.5, 0.9, by= 0.1))
 #alphas = c(0.1)
-lambda = 10^seq(-3, 3, length.out = 500)
+lambda = 10^seq(-3, 3, length.out = 400)
 nlambda = 400;
 
 # make a folder for the result
-if(TEST.glmnet.gene.specific.alpha) {testDir = paste0(resDir, "deconvolution_results/glmnet_tuning_gene_specific_alpha", version.analysis);
-}else{testDir = paste0(resDir, "deconvolution_results/glmnet_tuning_global_alpha", version.analysis); }
+if(TEST.glmnet.gene.specific.alpha) {
+  alpha.hyperparam = "gene.specific.alpha"
+}else{
+  alpha.hyperparam = "global.alpha"
+}
 
+testDir = paste0(resDir, "deconvolution_results")
+    
 if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
 
 source("select_tuningParams_elasticNet.R")
 for(method in Methods2test)
 {
-  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
+  cat("-- selecting model -- ", method, "\n")
+  pdfname = paste0(testDir, "/deconv_res", 
                    "_fitting.", fitting.space, 
-                   "_glmnet_global_alpha_method_select_tuning_parameters_", method,
+                   "_glmnet_global_alpha_method_select_tuning_parameters_", method, "_", alpha.hyperparam, version.analysis, 
                    ".pdf")
   
-  pdf(pdfname, width=20, height = 12)
+  pdf(pdfname, width=22, height = 10)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = FALSE, standardize = TRUE, nfold = 7,
+  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7,
                                       Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
   dev.off()

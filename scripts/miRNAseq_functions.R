@@ -1410,7 +1410,7 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     box()
     #abline(h=c(0, 2, 5), lwd=0.7, col='red')
     abline(h=0, lwd=2.0, col='darkgray')
-    abline(h=c(-1, 1), lwd=1.5, col='darkgray', lty=2)
+    abline(h=c(-1, 1), lwd=1.5, col='darkgray', lty=1)
     
   }
 }
@@ -1419,10 +1419,10 @@ calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
 {
   # cpm = cpm.piRNA.bc 
   cpm = log2(cpm);
+  
   enriched =  read.table(file = paste0("../results/tables_for_decomvolution", 
                                        "/tables/Enrichment_Matrix_13samples_allgenes_with_clusters_for_neuronClasses_20181203.txt"), 
                          sep = "\t", header = TRUE, row.names = 1)
-  
   enriched.list = read.table(file = paste0("../results/tables_for_decomvolution",
                                            "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
                              sep = "\t", header = TRUE, row.names = 1)
@@ -1453,19 +1453,14 @@ calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
   # and also outlier should be removed for the sake of robustness
   ##########################################
   require(MASS)
-  intercepts = c(0, rep(NA), (length(yy)-1))
+  intercepts = c(0, rep(NA, (ncol(yy)-1)))
   
-  mm = match(rownames(yy), enriched.list)
-  #sels = find.non.enriched.miRNAs(neurons, enrich.matrix, fc.cutoff = 1, pval.cutoff = 0.01)
-  #head(enrich.matrix[match(sels, rownames(enrich.matrix)), ])
-  jj = which(is.na(mm))
-  
+  jj = which(is.na(match(rownames(yy), enriched.list)))
+  #jj = c(1:nrow(yy))
   #jj = which(apply(yy, 1, mean)<5 & apply(yy, 1, mean)>-2)
   par(mfrow=c(3, 5))
   for(n in 2:ncol(yy)){
-    
     neurons = unlist(strsplit(as.character(colnames(yy)[n]), "_"))[1]
-    
     rrs = yy[jj,n] - yy[jj,1]
     #upper = quantile(rrs, 0.60, names = FALSE); lower = quantile(rrs, 0.10, names = FALSE)
     upper = 1; lower = quantile(rrs, 0.15, names = FALSE)
@@ -1473,13 +1468,14 @@ calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
     
     jj.middle = jj[intersect(which(rrs >= lower), which(rrs <= upper))]
     
+    cat("nb of non-enriched miRNAs used to calibrate the promoter efficiency -- ", length(jj.middle), "\n")
+    
     rfit = rlm((yy[jj.middle,n] - yy[jj.middle, 1]) ~ 1 )
     intercepts[n] = rfit$coefficients
     
     cat(median(rrs[which(rrs>lower & rrs< upper)]), " -- ",  intercepts[n], "\n")
-    plot(yy[jj.middle, 1], yy[jj.middle, n], ylab = paste0('bg -', neurons), xlab = "background in N2" )
-    abline(intercepts[n], 1, col = 'red', lwd=2.0)
-    
+    #plot(yy[jj.middle, 1], yy[jj.middle, n], ylab = paste0('bg -', neurons), xlab = "background in N2" )
+    #abline(intercepts[n], 1, col = 'red', lwd=2.0)
     
     kk = which(design.treated$prots == colnames(yy)[n])
     for(k in kk) treated[, k] = treated[,k] - intercepts[n];
@@ -1491,11 +1487,14 @@ calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
                      "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix_plus_mergedFractionMatrix", 
                      "_miRNAs_neurons_20180525", ".Rdata"))
   nbcells = apply(as.matrix(newprop), 1, sum)
-  nbcells = c(558,  2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
+  nbcells = c(2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
+  
+  intercepts = intercepts[-1]
+  # cat(length(nbcells), "--", length(intercepts), "\n")
   
   par(mfrow=c(1, 1))
-  plot(nbcells, intercepts, log='x')
-  text(nbcells, intercepts, names(intercepts), pos=1, cex = 0.6, offset = 0.2)
+  plot(nbcells, intercepts, log='x', xlim = c(1, 500), ylim = c(-1, 1))
+  text(nbcells, intercepts, names(intercepts), pos=1, cex = 0.8, offset = 0.2)
   abline(h = c(-1, 0, 1), col = 'red', lwd=2.0)
   
   #cpm.piRNA.bc.bgc = data.frame(untreated, treated, stringsAsFactors = FALSE)

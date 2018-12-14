@@ -7,6 +7,124 @@
 # Date of creation: Wed Sep 19 11:09:08 2018
 ##########################################################################
 ##########################################################################
+###############################
+# function to estimate degree of freedom for elastic-net 
+# this function is modified from 
+# https://github.com/lcallot/lassovar/blob/master/R/lassovar-ada.R
+# and the original paper comes from is following:
+# DEGREES OF FREEDOM IN LASSO PROBLEMS By Ryan J. Tibshirani and Jonathan Taylor1
+###############################
+estimate.elasticNet.df <-function(xx, alpha = 0,  fit)
+{
+  xx <- (cbind(1, xx))
+  dfs <- NULL
+  
+  for(l in fit$lambda){
+    # l = fit$lambda[1]
+    ccf = coef(fit, s = l)
+    kk = which(ccf != 0)
+    if(length(kk)==0) {
+      dfs = c(dfs, 0)
+    }else{
+      if(length(kk)==1) {
+        dfs = c(dfs, 1)
+      }else{
+        dfs <-c(dfs, sum(diag(xx[,kk] %*% solve(t(xx[ ,kk]) %*% xx[,kk] + l*(1.0-alpha)*diag(ncol(xx[,kk])))%*% t(xx[,kk]))))
+      }
+    }
+  }
+  
+  #plot(fit$lambda, dfs, col='blue')
+  #points(fit$lambda, fit$df, col='red')
+  
+  #abline(0, 1, lwd=2.0, col = 'red')
+  return(dfs)
+}
+
+calcluate.loglikelihood.glmnet = function(xx, yy, fit, use.deviance.glmnet = TRUE)
+{
+  if(use.deviance.glmnet){
+    loglike = -0.5*deviance.glmnet(fit)
+  }else{
+    model = fit;
+    coef = coef(model)
+    lambda = model$lambda
+    #df = model$df
+    
+    yhat=cbind(1,xx)%*%coef
+    
+    residuals = (yy- yhat)
+    mse = colMeans(residuals^2)
+    #sse = colSums(residuals^2)
+    loglike = log(mse)*length(yy)*(-0.5)
+  }
+  
+  return(loglike)
+}
+
+###############################
+# funtion to select tuning parameter for glmnet using methods, 
+# cv.lambda.1se, bic, aic, ebic, hbic ...
+###############################
+select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit, method = c("cv.lambda.1se"))
+{
+  # xx = x; yy = y[,n];
+  # coef(fit, s=cv.fit$lambda.1se);
+  if(method == "cv.lambda.1se") {
+    myCoefs <- coef(fit, s=cv.fit$lambda.1se);
+  }else{
+    if(method == "cv.lambda.min") {
+      myCoefs <- coef(fit, s=cv.fit$lambda.min);
+      
+    }else{
+      #n.var = (fit$df + 1);
+      n.data = length(yy);
+      n.var = estimate.elasticNet.df(xx, alpha = alpha,  fit)
+      # plot((fit$df+1), n.var); abline(0, 1, lwd=2.0, col='red')
+      #loglike.glment = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = TRUE)
+      loglike = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = FALSE)
+      
+      # plot(loglike.glment, loglike.mse);abline(0, 1, lwd=2.0, col='red')
+      
+      if(method == "bic"){
+        crits = -2*loglike + n.var *log(n.data)
+        optim.crits = which(crits==min(crits))
+      }
+      if(method == "aic"){
+        crits = -2*loglike + 2*n.var;
+        optim.crits = which(crits==min(crits))
+      }
+      if(method == "aicc"){
+        crits = -2*loglike + 2*n.var + (2*nvar*(nvar+1))/(n.data-nvar-1);
+        optim.crits = which(crits==min(crits))
+      }
+      
+      #plot(fit, label = TRUE); abline(v= c(cv.fit$lambda.min, cv.fit$lambda.1se)); abline(v=c(fit$lambda[optim.crits]), col='red')
+      myCoefs <- coef(fit, s=fit$lambda[optim.crits]);
+      
+    }
+  }
+  
+  #beta[n, (ncol(x)+1)] = mse
+  #beta[n, (ncol(x)+2)] =  cv.fit$cvm[n] # cv
+  #beta[n, (ncol(x)+3)] = n.data*log(mse) + 2*nvar # aic
+  #beta[n, (ncol(x)+4)] = n.data*log(mse) + 2*nvar + (2*nvar*(nvar+1))/(n.data-nvar-1) # aicc
+  #beta[n, (ncol(x)+5)] = n.data*log(mse) + 2*nvar*log(log(n.data)) # hqc
+  #beta[n, (ncol(x)+6)] = n.data*log(mse) + nvar*log(n.data) # bic
+  #gamma = 0.5; beta[n, (ncol(x)+7)] = n.data*log(mse) + nvar*(log(n.data) + 2*gamma*log(p_full)) # ebic
+  #gamma = 0.5; beta[n, (ncol(x)+8)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic
+  #gamma = 1; beta[n, (ncol(x)+9)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic2
+  #gamma = 2; beta[n, (ncol(x)+10)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic3
+  
+  return(myCoefs)
+  
+}
+
+########################################################
+########################################################
+# Section: test glmnet with global alpha and gene-specific alpha
+########################################################
+########################################################
 run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, 
                                                nlambda = 100, intercept = TRUE, standardize = FALSE,
                                                Gene.Specific.Alpha = FALSE,  
@@ -20,7 +138,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
   
   # basic arguments for cv.glmnet and glmnet
   #intercept=TRUE
-  #standardize=FALSE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
+  #standardize=TRUE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
   standardize.response=FALSE
   grouped = FALSE
   cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
@@ -44,7 +162,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
       set.seed(1)
       for(n in 1:ncol(y))
       {
-        # n = 2
+        # n = 1
         if(is.null(lambda)){
           cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
@@ -204,7 +322,12 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
   
 }
 
-
+########################################################
+########################################################
+# Section : test gcdnet
+# 
+########################################################
+########################################################
 select.tuning.parameters.for.gcdnet = function(x, y,lambda = NULL, lambda2 = 0.1, method = "cv.lambda.1se", omit.BIC = FALSE,  
                                                nfold = 10, nlambda = 100, standardize = FALSE,  
                                                mse.overfitting.threshold = 10^-5, plot.crit.bic = TRUE, main = NULL)
@@ -338,124 +461,6 @@ select.tuning.parameters.for.gcdnet = function(x, y,lambda = NULL, lambda2 = 0.1
   
 }
 
-########################################################
-########################################################
-# Section: test glmnet with global alpha and gene-specific alpha
-########################################################
-########################################################
-###############################
-# function to estimate degree of freedom for elastic-net 
-# this function is modified from 
-# https://github.com/lcallot/lassovar/blob/master/R/lassovar-ada.R
-# and the original paper comes from is following:
-# DEGREES OF FREEDOM IN LASSO PROBLEMS By Ryan J. Tibshirani and Jonathan Taylor1
-###############################
-estimate.elasticNet.df <-function(xx, alpha = 0,  fit)
-{
-  xx <- (cbind(1, xx))
-  dfs <- NULL
-  
-  for(l in fit$lambda){
-    # l = fit$lambda[1]
-    ccf = coef(fit, s = l)
-    kk = which(ccf != 0)
-    if(length(kk)==0) {
-      dfs = c(dfs, 0)
-    }else{
-      if(length(kk)==1) {
-        dfs = c(dfs, 1)
-      }else{
-        dfs <-c(dfs, sum(diag(xx[,kk] %*% solve(t(xx[ ,kk]) %*% xx[,kk] + l*(1.0-alpha)*diag(ncol(xx[,kk])))%*% t(xx[,kk]))))
-      }
-    }
-  }
-  
-  #plot(fit$lambda, dfs, col='blue')
-  #points(fit$lambda, fit$df, col='red')
-  
-  #abline(0, 1, lwd=2.0, col = 'red')
-  return(dfs)
-}
-
-calcluate.loglikelihood.glmnet = function(xx, yy, fit, use.deviance.glmnet = TRUE)
-{
-  if(use.deviance.glmnet){
-   loglike = -0.5*deviance.glmnet(fit)
-  }else{
-    model = fit;
-    coef = coef(model)
-    lambda = model$lambda
-    #df = model$df
-    
-    yhat=cbind(1,xx)%*%coef
-    
-    residuals = (yy- yhat)
-    mse = colMeans(residuals^2)
-    #sse = colSums(residuals^2)
-    loglike = log(mse)*length(yy)*(-0.5)
-  }
-  
-  return(loglike)
-}
-
-###############################
-# funtion to select tuning parameter for glmnet using methods, 
-# cv.lambda.1se, bic, aic, ebic, hbic ...
-###############################
-select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit, method = c("cv.lambda.1se"))
-{
-  # xx = x; yy = y[,n];
-  # coef(fit, s=cv.fit$lambda.1se);
-  if(method == "cv.lambda.1se") {
-    myCoefs <- coef(fit, s=cv.fit$lambda.1se);
-  }else{
-    if(method == "cv.lambda.min") {
-      myCoefs <- coef(fit, s=cv.fit$lambda.min);
-      
-    }else{
-      #n.var = (fit$df + 1);
-      n.data = length(yy);
-      n.var = estimate.elasticNet.df(xx, alpha = alpha,  fit)
-      # plot((fit$df+1), n.var); abline(0, 1, lwd=2.0, col='red')
-      #loglike.glment = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = TRUE)
-      loglike = calcluate.loglikelihood.glmnet(xx, yy, fit, use.deviance.glmnet = FALSE)
-      
-      # plot(loglike.glment, loglike.mse);abline(0, 1, lwd=2.0, col='red')
-      
-      if(method == "bic"){
-        crits = -2*loglike + n.var *log(n.data)
-        optim.crits = which(crits==min(crits))
-      }
-      if(method == "aic"){
-        crits = -2*loglike + 2*n.var;
-        optim.crits = which(crits==min(crits))
-      }
-      if(method == "aicc"){
-        crits = -2*loglike + 2*n.var + (2*nvar*(nvar+1))/(n.data-nvar-1);
-        optim.crits = which(crits==min(crits))
-      }
-      
-      plot(fit, label = TRUE); abline(v= c(cv.fit$lambda.min, cv.fit$lambda.1se)); abline(v=c(fit$lambda[optim.crits]), col='red')
-      
-      myCoefs <- coef(fit, s=fit$lambda[optim.crits]);
-      
-    }
-  }
-  
-  #beta[n, (ncol(x)+1)] = mse
-  #beta[n, (ncol(x)+2)] =  cv.fit$cvm[n] # cv
-  #beta[n, (ncol(x)+3)] = n.data*log(mse) + 2*nvar # aic
-  #beta[n, (ncol(x)+4)] = n.data*log(mse) + 2*nvar + (2*nvar*(nvar+1))/(n.data-nvar-1) # aicc
-  #beta[n, (ncol(x)+5)] = n.data*log(mse) + 2*nvar*log(log(n.data)) # hqc
-  #beta[n, (ncol(x)+6)] = n.data*log(mse) + nvar*log(n.data) # bic
-  #gamma = 0.5; beta[n, (ncol(x)+7)] = n.data*log(mse) + nvar*(log(n.data) + 2*gamma*log(p_full)) # ebic
-  #gamma = 0.5; beta[n, (ncol(x)+8)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic
-  #gamma = 1; beta[n, (ncol(x)+9)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic2
-  #gamma = 2; beta[n, (ncol(x)+10)] = n.data*log(mse) + 2*gamma*nvar*log(p_full)# hbic3
-  
-  return(myCoefs)
-  
-}
 
 
 ###############################
