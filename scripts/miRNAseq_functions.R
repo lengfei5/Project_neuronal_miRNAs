@@ -1064,8 +1064,8 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
     spikes = t(as.matrix(spikes))
     spikes = data.frame(gene=rownames(spikes), spikes, stringsAsFactors = FALSE) 
     
-    index.samples.with.spikeIns = which(design$tissue.cell=="Pan.neurons" & design$genotype=="WT")
-    spikes = process.countTable(all=spikes, design = design[index.samples.with.spikeIns, ], select.Total.count = FALSE)
+    index.samples.with.spikeIns = which(design.matrix$tissue.cell=="Pan.neurons" & design.matrix$genotype=="WT")
+    spikes = process.countTable(all=spikes, design = design.matrix[index.samples.with.spikeIns, ], select.Total.count = FALSE)
     rownames(spikes) = spikes$gene;
     spikes = spikes[, -1]
     
@@ -1116,8 +1116,18 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
       par(mfrow=c(1,1))
       plot(sf.s, sf.p, log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=1.5, xlim = c(4, 400), ylim = c(0.2, 50),
            xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
-      #abline(0, (median(sf.p/sf.s)), lwd=2.0, col="red")
+      abline(log10(median(sf.p/sf.s)), 1, lwd=2.0, col="red")
       text(sf.s, sf.p, labels = colnames(pans), offset = 0.5, pos = 1, cex = 0.7)
+      
+      kk = c(grep("71822", colnames(pans)), grep("71823", colnames(pans)))
+      
+      plot(sf.s[-kk], sf.p[-kk], log='xy', main = "spikeIns norm vs piRNAs norm", col='darkgreen', pch=16, cex=1.5, 
+           xlim = c(4, 400), ylim = c(0.2, 50),
+           xlab= 'sizeFactor.spikeIns', ylab='sizeFactor.piRNAs')
+      abline(log10(median(sf.p/sf.s)[-kk]), 1, lwd=2.0, col="red")
+      text(sf.s[-kk], sf.p[-kk], labels = colnames(pans)[-kk], offset = 0.5, pos = 1, cex = 0.7)
+      
+      
     }else{
       par(mfrow=c(2,2))
       sf.pp = piRNA.sizeFctors.pans
@@ -1159,6 +1169,7 @@ Compare.piRNA.siRNA.spikeIns.for.scaling.factors = function(library.sizes, stats
       sizefactors = as.numeric(piRNA.sizeFctors.pans)  
       cat("-- use piRNA size factors --\n")
     }
+    
     cpm.piRNA = pans;
     for(n in 1:ncol(cpm.piRNA)) cpm.piRNA[,n] = cpm.piRNA[,n]/sizefactors[n]*10^6
     

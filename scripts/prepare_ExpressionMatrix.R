@@ -167,7 +167,7 @@ if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
   
   # common quality control normalized by DESeq2 
   source("RNAseq_Quality_Controls.R")
-  Check.RNAseq.Quality(read.count=countData, design.matrix = design.matrix[, c(1, 3,5)], lowlyExpressed.readCount.threshold = 0)
+  Check.RNAseq.Quality(read.count=countData, design.matrix = design.matrix[, c(1,3,5)], lowlyExpressed.readCount.threshold = 0)
   
   source("miRNAseq_functions.R")
   Compare.piRNA.siRNA.spikeIns.for.scaling.factors(library.sizes, stats, countData, design.matrix)
@@ -200,7 +200,7 @@ if(Compare.piRNA.siRNA.spikeIns.as.scaling.factors){
 }
 
 ####################
-## Normalize the data using piRNAs 
+## Normalize the data using piRNAs
 ####################
 #sizefactors.piRNA = stats$piRNA/median(stats$piRNA) 
 #sizefactors.siRNA = stats$siRNA/median(stats$siRNA)
