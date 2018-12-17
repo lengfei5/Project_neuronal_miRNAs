@@ -330,11 +330,10 @@ if(Try.Calibrate.promoter.methylation.efficiency){
   xx = calibrate.promoter.methylation.efficiency(cpm.piRNA.bc, design.matrix)
   cpm.piRNA.bc.prot = 2^xx
   
-  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc.protc, design.matrix)
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc.prot, design.matrix)
   #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
   #Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
   dev.off()
-  
   
 }
 
@@ -345,13 +344,15 @@ save(cpm.piRNA.bc.prot,
      design.matrix, 
      file = paste0(RdataDir, 'piRANormalized_cpm.piRNAnorm_batchCorrectedCombat_calibratedProtEff_', version.table, '.Rdata'))
 
-
 ######################################
 ######################################
 ## Section: save the tables and check the expression matrix 
 ######################################
 ######################################
-load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
+#load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.table, '.Rdata'))
+load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNAnorm_batchCorrectedCombat_calibratedProtEff_', version.table, '.Rdata'))
+cpm.piRNA.bc = log2(cpm.piRNA.bc.prot)
+cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
 
 jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
 total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)

@@ -1405,7 +1405,7 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     #legend("topright", col=c('darkblue', "black"),  bty = "n", legend = c("treated", "untreated"), lty=1 )
     axis(2, las= 1)
     ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
-    ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
+    #ns.short[c(3:5, 8,10, 11)] = c("Seroton", "Dopamin", "Gluta", "mecha", 'pharyn', "cholin")
     axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
     box()
     #abline(h=c(0, 2, 5), lwd=0.7, col='red')
