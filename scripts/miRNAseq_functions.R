@@ -1242,7 +1242,7 @@ my.plotPCA = function(xx, design.matrix){
   
 }
 
-Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.sel, fitting.space = "log2")
+Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.sel, fitting.space = "log2", compare.Pan.vs.otherfiveSamples = FALSE)
 {
   library("pheatmap")
   library("RColorBrewer")
@@ -1251,17 +1251,12 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   xx[which(xx>0)] = 1
   
   yy = expression.sel;
-  
-  
+  #yy[yy<0] = 0
   if(fitting.space == 'linear') {
     logaxis = 'xy';
     yy = t(log2(t(yy)/yy[which(rownames(yy)=='background'), ]));
-    
-    xx = xx[-1, -1];
-    yy = yy[-1,  ]
-    
+    xx = xx[-1, -1];  yy = yy[-1,  ]
   }else{logaxis = ''}
-  
   
   pheatmap(xx, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
            cluster_cols=TRUE, 
@@ -1271,24 +1266,35 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
            cluster_cols=TRUE, 
            color = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100))
   
-  ## double check the expression matrix
-  par(mfrow = c(1, 1))
-  mm = match(c("Cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
-  ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
-  
-  plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
-       ylab = "sum of Cho, Glut, GABA, Dop and Ser", xlim = ranges, ylim = ranges)
-  abline(0, 1, col="red", lwd=2.0)
-  #abline(h=1, col="darkgray", lwd=2.0)
-  
-  text(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
-       pos = 1, offset = 0.4)
-  
-  par(mfrow = c(1, 2))
-  plot(t(expression.sel[match(c("Dopaminergic", "Ciliatedsensory"), rownames(expression.sel)), ]), log=logaxis)
-  abline(0, 1, lwd=2.0, col='red')
-  plot(t(expression.sel[match(c("Mechanosensory",  "unc.86"), rownames(expression.sel)), ]), log=logaxis)
-  abline(0, 1, lwd=2.0, col='red')
+  if(compare.Pan.vs.otherfiveSamples){
+    ## double check the expression matrix
+    par(mfrow = c(1, 1))
+    mm = match(c("Cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
+    ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
+    
+    plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = "compare pan vs other five samples", xlim = c(-1, 10), ylim = c(-1, 25))
+    abline(0, 1, col="red", lwd=2.0)
+    abline(0.5, 1, col="red", lwd=1.0, lty = 2)
+    abline(-0.5, 1, col="red", lwd=1.0, lty =2)
+    abline(1, 1, col="red", lwd=1.0, lty=3)
+    abline(-1, 1, col="red", lwd=1.0, lty=3)
+    #text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
+    #     pos = 1, offset = 0.4)
+    #plot(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+    #     ylab = "sum of Cho, Glut, GABA, Dop and Ser", xlim = ranges, ylim = ranges)
+    #abline(0, 1, col="red", lwd=2.0)
+    #abline(h=1, col="darkgray", lwd=2.0)
+    
+    text(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.8,
+         pos = 1, offset = 0.4)
+    
+    par(mfrow = c(1, 2))
+    plot(t(expression.sel[match(c("Dopaminergic", "Ciliatedsensory"), rownames(expression.sel)), ]), log=logaxis)
+    abline(0, 1, lwd=2.0, col='red')
+    plot(t(expression.sel[match(c("Mechanosensory",  "unc.86"), rownames(expression.sel)), ]), log=logaxis)
+    abline(0, 1, lwd=2.0, col='red')
+  }
   
 }
 
@@ -1384,7 +1390,6 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     #points(c(1:length(ns)), tcs[kk, ], type = "b", cex=1.0, col = 'darkblue')
     #points(c(1:length(ns)), total[kk, ], type= 'l', col='black', cex=1.0)
     #points(c(1:length(ns)), total[kk, ], type= 'b', col= "black", cex= 1.0)
-    
     
     for(n in 1:length(ns))
     {
@@ -1528,5 +1533,39 @@ find.non.enriched.miRNAs = function(neurons, enrich.matrix, fc.cutoff = 0, pval.
   return(ggs)
 }
 
+######################################
+######################################
+## Section (additional) : 
+# other utility plots or tables
+# calculate pvalue for overlapping groups
+######################################
+######################################
+calculate.pval.for.overlapping.groups = function(xx)
+{
+  if(calculate.pval.for.overlapping.groups){
+    
+    library(openxlsx)
+    aa = read.xlsx("../results/decomvolution_results/pvalue_overlapping_groups.xlsx", sheet = 2, colNames = TRUE, detectDates = TRUE)
+    aa = aa[which(!is.na(aa[, 1])==TRUE), ] 
+    aa = data.frame(aa)
+    aa$TOTAL.NUMBER.OF.EXPRESSED.miRNAs = 123
+    
+    aa = aa[, c(1:5)]
+    source("miRNAseq_functions.R")
+    xx = c()  
+    for(n in 1:nrow(aa))
+    {
+      #n = 1
+      xx = rbind(xx, calculate.pvalues.two.groups.overlapping(aa$TOTAL.NUMBER.OF.EXPRESSED.miRNAs[n], 
+                                                              aa$groupA[n],
+                                                              aa$groupB[n], 
+                                                              aa$OVERLAP[n]))
+    }
+    
+    aa = data.frame(aa, observersion.expected=xx[,1], pval=xx[, 2], stringsAsFactors = FALSE)
+    write.xlsx(aa, file='..//results/decomvolution_results/pvalue_overlapping_groups_byJingkui.xlsx')
+    
+  }
+}
 
 

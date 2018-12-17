@@ -135,6 +135,13 @@ if(!Use.mergedExpressionMatrix){
   ####################
   expression = xx[, -c(1)] # ignore the gene expression in the whole body
   
+  Save.table.for.Chiara = FALSE
+  if(Save.table.for.Chiara){
+    write.csv(cpm.piRNA.bc.prot, 
+              file = paste0("../results/final_tables_4Chiara/", 
+                            "expression_matrix_allReplicates_piRNANorm_bacthCorrection_promoterCalibration", 
+                            version.analysis, ".csv"), col.names = TRUE, row.names = TRUE)
+  }
   
 }else{
   source('miRNAseq_functions.R')
@@ -153,12 +160,19 @@ if(!Use.mergedExpressionMatrix){
 # mannually unify the names of each sample A and Y 
 ###############################
 if(Manually.unifiy.sample.names.forMatrix){
-  rownames(proportions) = c("Dopaminergic","Serotonergic","Glutamatergic", "Cholinergic", "GABAergic",  "Ciliatedsensory",
-                            "Mechanosensory", "unc.86", "Pharyngeal", "ceh.14", "unc.42", "unc.3","ASE", "Pan.neurons")
+ 
+  #old.sampleNames = rownames()
+  newSampleNames.prop = c("Dopaminergic","Serotonergic","Glutamatergic", "Cholinergic", "GABAergic",  "Ciliatedsensory",
+                           "Mechanosensory", "unc.86", "Pharyngeal", "ceh.14", "unc.42", "unc.3","ASE", "Pan.neurons")
+  print(cbind(rownames(proportions), newSampleNames.prop))
+  rownames(proportions) = newSampleNames.prop;
+  
   expression = t(expression)
-  rownames(expression) = c( "background", "ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
-                            "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42", 
-                            "unc.3", "Pan.neurons")
+  newSampleNames.expr = c( "background", "ASE", "Serotonergic", "Dopaminergic", "Glutamatergic", "Ciliatedsensory",
+                           "GABAergic", "Mechanosensory", "unc.86", "Pharyngeal", "Cholinergic", "ceh.14", "unc.42", 
+                           "unc.3", "Pan.neurons")
+  print(cbind(rownames(expression), newSampleNames.expr))
+  rownames(expression) = newSampleNames.expr
   
   ###############################
   # if fitting in linear scale, then the background sample is used and the background is added in proportion matrix as well
@@ -233,6 +247,7 @@ if(Data.complete){
 ####################
 if(Check.ProprotionMatrix.ExpressionMatrix){
   source("miRNAseq_functions.R")
+  
   pdfname = paste0(resDir, "/Heatmap_Proportiona_Expression_Matrix", version.analysis, ".pdf")
   pdf(pdfname, width=15, height = 6)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -269,7 +284,7 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   
   x = x >0
   Example2test = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
-  #Example2test = c(Example2test, setdiff(colnames(y), Example2test))
+  Example2test = c(Example2test, setdiff(colnames(y), Example2test))
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
   
@@ -305,12 +320,12 @@ require(glmnet)
 library("pheatmap")
 library("RColorBrewer")
 TEST.glmnet.gene.specific.alpha = FALSE
-save.optimal.results.for.downstream.analysis = TRUE
+save.deconvolution.results.for.downstream.analysis = TRUE
 
-#Methods2test = c("cv.lambda.1se", "bic", "aic", "aicc")
-Methods2test = c("cv.lambda.1se", "bic")
-Methods2test = c("bic")
-alphas = c(seq(0.5, 0.9, by= 0.1))
+#Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
+#Methods2test = c("cv.lambda.1se", "bic")
+Methods2test = c("cv.lambda.1se")
+alphas = c(seq(0.3, 1.0, by= 0.05))
 #alphas = c(0.1)
 lambda = 10^seq(-3, 3, length.out = 400)
 nlambda = 400;
@@ -322,14 +337,14 @@ if(TEST.glmnet.gene.specific.alpha) {
   alpha.hyperparam = "global.alpha"
 }
 
-testDir = paste0(resDir, "deconvolution_results")
+testDir = paste0(resDir, "deconv_results")
     
 if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
 
 source("select_tuningParams_elasticNet.R")
 for(method in Methods2test)
 {
-  cat("-- selecting model -- ", method, "\n")
+  cat("-- model selection method -- ", method, "\n")
   pdfname = paste0(testDir, "/deconv_res", 
                    "_fitting.", fitting.space, 
                    "_glmnet_global_alpha_method_select_tuning_parameters_", method, "_", alpha.hyperparam, version.analysis, 
@@ -344,33 +359,40 @@ for(method in Methods2test)
   
   dev.off()
   
+  save(x, y, alphas, res, file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
+                                        version.analysis, ".Rdata"))
+  
 }
 
-if(save.optimal.results.for.downstream.analysis){
+if(save.deconvolution.results.for.downstream.analysis){
   
-  jj = which(alphas>=0.6 & alphas <0.8)
-  cat(jj, "\n")
-  for(n in 1:length(jj))  cat(keep[[jj[n]]], "\n")
+  load(file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
+                     version.analysis, ".Rdata"))
   
-  res = keep[[13]]
+  tabDir = paste0(testDir, "/tables/")
+  if(!dir.exists(tabDir)) system(paste0('mkdir -p ', tabDir))
   
-  save(res, file = paste0(RdataDir, "preliminary_results_for_Chiara_Recess_global_alpha_method_1se_alpha_0.7.Rdata"))
-  #testDir = paste0(resDir, "decon_TEST/deconv_test_09_21_glmnet_tuning_global_alpha_plots4recess"); }
-  #if(!dir.exists(testDir)) dir.create(testDir)
-  
-  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
-                   "_fitting.", fitting.space, 
-                   "_glmnet_global_alpha_method_select_tuning_parameters_", method,
-                   ".pdf")
-  pdf(pdfname, width=8, height = 12)
+  pdfname = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", 
+                   method, "_", alpha.hyperparam,
+                   version.analysis, ".pdf")
+  pdf(pdfname, width=20, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
-  cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(100)
   
-  
-  pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-           cluster_cols=FALSE, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "white",
-           color = cols)
+  for(n in 1:length(alphas)){
+    cat("alpha -- ", alphas[n], "\n")
+    res = keep[[n]];
+    write.csv(res, file = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam, 
+                     version.analysis, "_alpha_", alphas[n], ".csv"), row.names = TRUE, col.names = TRUE)
+    
+    cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(100)
+    
+    pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+             cluster_cols=FALSE, main = paste0("alpha = ", alphas[n], " - method : ", method), na_col = "white",
+             color = cols)
+    
+    
+  }
   
   dev.off()
   
