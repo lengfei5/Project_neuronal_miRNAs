@@ -318,7 +318,7 @@ if(Try.Calibrate.promoter.methylation.efficiency){
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   source("miRNAseq_functions.R")
-  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix)
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix, logscale = FALSE)
   
   dev.off()
   
@@ -330,7 +330,7 @@ if(Try.Calibrate.promoter.methylation.efficiency){
   xx = calibrate.promoter.methylation.efficiency(cpm.piRNA.bc, design.matrix)
   cpm.piRNA.bc.prot = 2^xx
   
-  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc.prot, design.matrix)
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc.prot, design.matrix, logscale = FALSE)
   #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
   #Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
   dev.off()

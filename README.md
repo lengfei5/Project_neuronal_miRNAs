@@ -34,13 +34,18 @@ This reprosition is for the deconvolution analysis for Chiara's project
     - [x] By comparing the log and linear scaling with examples lsy-6, mir-791, mir-790, the observation is that the total amount of specific microRNA defined by pan-neurons is much large than other samples, consequently, the linear model must assign the rest to some neurons, which makes false positives; in contrast, in log-scale the solution will be much sparse and resonable, whereas the interpretation will be non-trivial
     - Conclusion: the combat batch correction works quite well and the log ratio (treated/untreated) does not solve the problem for rab-3 sample
   
-  - [ ] Improve the model fitting, especially for known examples, lsy-6 
-    
-    - [ ] recheck the linear model, especailly the intercept for the background; perhaps we can consider promoter-specific background, which take into count the           miRNAs in the background compositions and also the promoter mythelation efficiencies.  
+ - [x] promoter calibration
+      recheck the linear model, especailly the intercept for the background; perhaps we can consider promoter-specific background, which take into count the           miRNAs in the background compositions and also the promoter mythelation efficiencies.  
           - after batch correction, use non-enriched miRNAs to calibrate the background (background calibration)
           - to have robust estimation, all miRNAs (including the ones not passing expressing thresholds) (have a try)
           - there are two things: the sample-specific background due to the background miRNAs composition bias; which is in principle correlated to the sample size; the second thing is the promoter-sepecific efficiencies, which can not be corrected. 
           The background model here is : Yg,s = Bg,0 + delta_Bg,s + alpha_g,s * Cg,s where the delta_Bg,s should be alway negative or close to zero. 
+
+ - Test again the linear scale fitting 
+ 
+ - [ ] Improve the model fitting, especially for known examples, lsy-6 
+    
+   
     - [ ] Integrate the sample qualities or sample variance into into the linear model ??
     - [ ] post-filtering (i.e. removing non-significant ones)
   
