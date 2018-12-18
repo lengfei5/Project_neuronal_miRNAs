@@ -1309,8 +1309,9 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   
 }
 
-Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix)
+Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix, logscale = TRUE)
 {
+  
   #cpm.piRNA.bc.meanrep.log2 = log2(cpm.piRNA.bc)
   
   selections = c("all")
