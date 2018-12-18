@@ -1309,7 +1309,7 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   
 }
 
-Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix, logscale = TRUE)
+Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix, logscale = FALSE)
 {
   #cpm.piRNA.bc.meanrep.log2 = log2(cpm.piRNA.bc)
   
@@ -1404,12 +1404,19 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
                "mir-245", "mir-34", "mir-794", "mir-1020")
   #kk = match(examples, rownames(cpm.piRNA.bc)
   ns = unique(design.matrix$tissue.cell)
-  cpm = log2(cpm.piRNA.bc)
+  #scales = c("log", "linear")
+  if(logscale){
+    cpm = log2(cpm.piRNA.bc)
+  }else{
+    #cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+    cpm = cpm.piRNA.bc;
+  }
+
   par(mfrow=c(2, 2))
+  par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   for(gg in examples)
   {
     #gg = "lsy-6"
-    par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
     ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
     kk = which(rownames(cpm)==gg)
     index.bg = which(design.matrix$tissue.cell == "whole.body" & design.matrix$treatment=="treated");
@@ -1417,7 +1424,12 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
     ns = setdiff(ns, "whole.body")
     ns.mean = c()
     
-    lims = range(cpm[kk, ] - bg.mean)
+    if(logscale){
+      lims = range(cpm[kk, ] - bg.mean)
+    }else{
+      lims = range(cpm[kk, grep("_treated", colnames(cpm))] - bg.mean)
+    }
+   
     plot(c(1:length(ns)), rep(1, length(ns)), type= 'n', col='darkblue', cex=1.0, log='', ylim =lims, main = paste0(gg), xlab=NA, 
          ylab = 'normalizaed by piRNAs', axe = FALSE)
     

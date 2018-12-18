@@ -41,11 +41,10 @@ This reprosition is for the deconvolution analysis for Chiara's project
           - there are two things: the sample-specific background due to the background miRNAs composition bias; which is in principle correlated to the sample size; the second thing is the promoter-sepecific efficiencies, which can not be corrected. 
           The background model here is : Yg,s = Bg,0 + delta_Bg,s + alpha_g,s * Cg,s where the delta_Bg,s should be alway negative or close to zero. 
 
- - Test again the linear scale fitting 
+ - [ ] Test again the linear scale fitting 
  
  - [ ] Improve the model fitting, especially for known examples, lsy-6 
     
-   
     - [ ] Integrate the sample qualities or sample variance into into the linear model ??
     - [ ] post-filtering (i.e. removing non-significant ones)
   
