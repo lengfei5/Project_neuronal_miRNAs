@@ -1309,91 +1309,152 @@ Plot.ProprotionMatrix.ExpressionMatrix = function(proportions.sel, expression.se
   
 }
 
-Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix, logscale = FALSE)
+########################################################
+########################################################
+# Section : functions of comparing the pan.neuron and other five samples
+#  and check miRNA examples
+########################################################
+########################################################
+plot.comparison.pan.vs.other.five.samples = function(cpm, logscale = FALSE)
 {
-  #cpm.piRNA.bc.meanrep.log2 = log2(cpm.piRNA.bc)
+  if(logscale){
+    cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm)); 
+  }else{
+    cpm.piRNA.bc.meanrep = average.biological.replicates(cpm);
+  }
   
+  jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
+  total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
+  xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
+  ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+  ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+  
+  colnames(xx) = c('whole.body', 'background', ncs)
+  
+  expression = xx[, -c(1:2)]
+  
+  # N2 as background in both linear and log scale 
+  for(n in 1:ncol(expression)) expression[,n] = expression[,n] - xx$background
+  
+  enriched.list = read.table(file = paste0(resDir, "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
+                             sep = "\t", header = TRUE, row.names = 1)
+  enriched.list = colnames(enriched.list)
+  enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
+  mm = match((enriched.list), rownames(expression))
+  
+  expression.sel = t(expression[mm, ])
+  #expression.sel = log2(expression.sel)
+  
+  ##########################################
+  # for both log and liear scale, the signals below background are converted to 0 (in log scale) or very samll number (10^-6)
+  ##########################################
+  yy = expression.sel;
+  mm = match(c("cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
+  
+  #ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
+  if(logscale){
+    yy[yy<0] = 0;
+    sel = paste0("convert to zeros if below background (log2 scale)")
+    cat(sel, "\n")
+    xlim = c(-1, 10); ylim = c(-1, 25)
+    plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = xlim, ylim = ylim)
+    abline(0, 1, col="red", lwd=2.0)
+    abline(0.5, 1, col="red", lwd=1.0, lty = 2)
+    abline(-0.5, 1, col="red", lwd=1.0, lty =2)
+    abline(1, 1, col="red", lwd=1.0, lty=3)
+    abline(-1, 1, col="red", lwd=1.0, lty=3)
+    text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.5,
+         pos = 1, offset = 0.4)
+  }else{
+    #if(convert.negatives == 0){}
+    yy[yy<0] = 10^-2;
+    sel = paste0("convert 10-2 if below background (linear scale)")
+    cat(sel, "\n")
+    
+    xlim = range(yy[which(rownames(yy)=="Pan"), ]);
+    ylim = range(apply(as.matrix(yy[mm, ]), 2, sum))
+    plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
+         ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = xlim, ylim = ylim, log = "xy")
+    ratios = median(apply(as.matrix(yy[mm, ]), 2, sum) /yy[which(rownames(yy)=="Pan"), ])
+    abline(0, 1, col="red", lwd=2.0)
+    points(xlim, ratios*xlim, col="darkgreen", lwd=2.0, type = "l")
+    abline(0.5, 1, col="red", lwd=1.0, lty = 2)
+    abline(-0.5, 1, col="red", lwd=1.0, lty =2)
+    abline(1, 1, col="red", lwd=1.0, lty=3)
+    abline(-1, 1, col="red", lwd=1.0, lty=3)
+    text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.5,
+         pos = 1, offset = 0.4)
+  }
+  
+  #for(convert.negatives in c(0, 1)){ }
+}
+
+plot.miRNA.examples = function(cpm,  gg = c("lsy-6"), design.matrix, logscale = FALSE)
+{
+  ns = unique(design.matrix$tissue.cell)
+  
+  if(logscale){
+    cpm = log2(cpm)
+  }
+  
+  kk = which(rownames(cpm)==gg)
+  index.bg = which(design.matrix$tissue.cell == "whole.body" & design.matrix$treatment=="treated");
+  bg.mean = median(cpm[kk, index.bg]);
+  ns = setdiff(ns, "whole.body")
+  ns.mean = c()
+  
+  if(logscale){
+    lims = range(cpm[kk, ] - bg.mean)
+    main = paste0(gg, "-- log2 scale");
+  }else{
+    lims = range(cpm[kk, grep("_treated", colnames(cpm))] - bg.mean)
+    main = paste0(gg, "-- linear scale");
+  }
+  
+  plot(c(1:length(ns)), rep(1, length(ns)), type= 'n', col='darkblue', cex=1.0, log='', ylim =lims, main = main, xlab=NA, 
+       ylab = 'normalizaed by piRNAs', axe = FALSE)
+  
+  for(n in 1:length(ns))
+  {
+    index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")
+    points(rep(n, length(index.ns)), (cpm[kk, index.ns] - bg.mean), type = "p", col='darkblue', cex=1., pch =16)
+    ns.mean = c(ns.mean, median(cpm[kk, index.ns] - bg.mean))
+    # add sample ids 
+    if(ns[n]=="Pan.neurons"){
+      text(rep(n, length(index.ns)), (cpm[kk, index.ns] - bg.mean), design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
+      abline(h = median((cpm[kk, index.ns] - bg.mean)), lwd=1.5, col = 'darkblue')
+    }
+    index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
+    points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1., pch = 0)
+    
+  }
+  points(c(1:length(ns)), ns.mean, type = "l", cex=1.0, col = 'darkgreen')
+  points(c(1:length(ns)), ns.mean, type = "p", cex=1.0, col = 'darkgreen')
+  axis(2, las= 1)
+  ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
+  axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
+  box()
+  #abline(h=c(0, 2, 5), lwd=0.7, col='red')
+  abline(h=0, lwd=2.0, col='darkgray')
+  if(logscale)  abline(h=c(-1, 1), lwd=1.5, col='darkgray', lty=1)
+  
+}
+
+Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm.piRNA.bc, design.matrix)
+{
+  ##########################################
+  # compare the pan.neuron vs the sum of other five samples
+  # which is a control showing that our data is good for the linear model
+  ##########################################
   selections = c("all")
-  # sel = "all"
   for(sel in selections)
   {
-    if(logscale){
-      cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc))
-    }else{
-      cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
-    }
-    #if(sel == "all") 
-    #if(sel == "rab-3") {cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc))
-    #  cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc[, c(1:64)]))
-    #}
-    #if(sel=="rgef-1"){
-    #  cpm.piRNA.bc.meanrep = average.biological.replicates(log2(cpm.piRNA.bc[, -c(59:64)]))
-    #}
-    
-    jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
-    total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
-    xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
-    ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
-    ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
-    
-    colnames(xx) = c('whole.body', 'background', ncs)
-    
-    expression = xx[, -c(1:2)]
-    for(n in 1:ncol(expression)) expression[,n] = expression[,n] - xx$background
-    
-    enriched.list = read.table(file = paste0(resDir, "/tables/Enrichment_Matrix_13samples_66genes_with_clusters_for_neuronClasses.txt"), 
-                               sep = "\t", header = TRUE, row.names = 1)
-    enriched.list = colnames(enriched.list)
-    enriched.list = sapply(enriched.list, function(x) gsub("[.]", "-", x), USE.NAMES = FALSE)
-    mm = match((enriched.list), rownames(expression))
-    
-    expression.sel = t(expression[mm, ])
-    #expression.sel = log2(expression.sel)
-    
-    ## double check the expression matrix
-    par(mfrow = c(1, 1))
-    for(convert.negatives in c(0, 1)){
-      if(convert.negatives == 0) {
-        yy = expression.sel;
-        sel = paste0("all -- keep negative values below background")
-      }else{
-        yy = expression.sel;
-        yy[yy<0] = 0
-        sel = paste0("all -- convert zeros for negative values below background")
-      }
-      cat(sel, "\n")
-      mm = match(c("cholinergic", "Glutamatergic",  "GABAergic",  "Dopaminergic", "Serotonergic"), rownames(yy))
-      #ranges = range(c(yy[which(rownames(yy)=="Pan.neurons"), ], apply(as.matrix(yy[mm, ]), 2, sum)))
-      if(logscale){
-        xlim = c(-1, 10); ylim = c(-1, 25)
-        plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
-             ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = xlim, ylim = ylim)
-        abline(0, 1, col="red", lwd=2.0)
-        abline(0.5, 1, col="red", lwd=1.0, lty = 2)
-        abline(-0.5, 1, col="red", lwd=1.0, lty =2)
-        abline(1, 1, col="red", lwd=1.0, lty=3)
-        abline(-1, 1, col="red", lwd=1.0, lty=3)
-        text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
-             pos = 1, offset = 0.4)
-      }else{
-        if(convert.negatives == 0){
-          yy[yy<0] = 10^-6;
-          xlim = range(yy[which(rownames(yy)=="Pan"), ]);
-          ylim = range(apply(as.matrix(yy[mm, ]), 2, sum))
-          plot(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), xlab = "Pan.neurons", 
-               ylab = "sum of Cho, Glut, GABA, Dop and Ser", main = sel, xlim = xlim, ylim = ylim, log = "xy")
-          abline(0, 1, col="red", lwd=2.0)
-          abline(0.5, 1, col="red", lwd=1.0, lty = 2)
-          abline(-0.5, 1, col="red", lwd=1.0, lty =2)
-          abline(1, 1, col="red", lwd=1.0, lty=3)
-          abline(-1, 1, col="red", lwd=1.0, lty=3)
-          text(yy[which(rownames(yy)=="Pan"), ], apply(as.matrix(yy[mm, ]), 2, sum), labels = colnames(yy), cex = 0.7,
-               pos = 1, offset = 0.4)
-        }
-      }
-
-    }
+    par(mfrow = c(1, 2))
+    plot.comparison.pan.vs.other.five.samples(cpm.piRNA.bc, logscale = TRUE)
+    plot.comparison.pan.vs.other.five.samples(cpm.piRNA.bc)
   }
+  
   ##########################################
   # check lsy-6 and other examples
   ##########################################
@@ -1402,65 +1463,18 @@ Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples = function(cpm
                "mir-243", "lin-4", "mir-249", "mir-789-2",
                "mir-1830", "mir-392", "mir-238", "mir-254",
                "mir-245", "mir-34", "mir-794", "mir-1020")
-  #kk = match(examples, rownames(cpm.piRNA.bc)
-  ns = unique(design.matrix$tissue.cell)
-  #scales = c("log", "linear")
-  if(logscale){
-    cpm = log2(cpm.piRNA.bc)
-  }else{
-    #cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
-    cpm = cpm.piRNA.bc;
-  }
 
-  par(mfrow=c(2, 2))
+  par(mfrow=c(1, 2))
   par(cex =0.7, mar = c(8,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   for(gg in examples)
   {
-    #gg = "lsy-6"
-    ## check lsy-6 in ASE, Glutatamatergic and Ciliated neurons
-    kk = which(rownames(cpm)==gg)
-    index.bg = which(design.matrix$tissue.cell == "whole.body" & design.matrix$treatment=="treated");
-    bg.mean = median(cpm[kk, index.bg]);
-    ns = setdiff(ns, "whole.body")
-    ns.mean = c()
-    
-    if(logscale){
-      lims = range(cpm[kk, ] - bg.mean)
-    }else{
-      lims = range(cpm[kk, grep("_treated", colnames(cpm))] - bg.mean)
-    }
-   
-    plot(c(1:length(ns)), rep(1, length(ns)), type= 'n', col='darkblue', cex=1.0, log='', ylim =lims, main = paste0(gg), xlab=NA, 
-         ylab = 'normalizaed by piRNAs', axe = FALSE)
-    
-    for(n in 1:length(ns))
-    {
-      index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="treated")
-      points(rep(n, length(index.ns)), (cpm[kk, index.ns] - bg.mean), type = "p", col='darkblue', cex=1., pch =16)
-      ns.mean = c(ns.mean, median(cpm[kk, index.ns] - bg.mean))
-      # add sample ids 
-      if(ns[n]=="Pan.neurons"){
-        text(rep(n, length(index.ns)), (cpm[kk, index.ns] - bg.mean), design.matrix$SampleID[index.ns], pos = 2, offset = 0.5, cex = 0.8)
-        abline(h = median((cpm[kk, index.ns] - bg.mean)), lwd=1.5, col = 'darkblue')
-      }
-      index.ns = which(design.matrix$tissue.cell==ns[n] & design.matrix$treatment=="untreated")
-      points(rep(n, length(index.ns)), cpm[kk, index.ns], type = "p", col='black', cex=1., pch = 0)
-      
-    }
-    points(c(1:length(ns)), ns.mean, type = "l", cex=1.0, col = 'darkgreen')
-    points(c(1:length(ns)), ns.mean, type = "p", cex=1.0, col = 'darkgreen')
-    axis(2, las= 1)
-    ns.short = sapply(ns, function(x) unlist(strsplit(x, "[.]"))[1], USE.NAMES = FALSE)
-    axis(1, at=c(1:length(ns)), labels = ns.short, las=2,cex=0.5)
-    box()
-    #abline(h=c(0, 2, 5), lwd=0.7, col='red')
-    abline(h=0, lwd=2.0, col='darkgray')
-    abline(h=c(-1, 1), lwd=1.5, col='darkgray', lty=1)
-    
+    # gg = "lsy-6"
+    plot.miRNA.examples(cpm = cpm.piRNA.bc, gg, design.matrix, logscale = TRUE)
+    plot.miRNA.examples(cpm = cpm.piRNA.bc, gg, design.matrix, logscale = FALSE)
   }
 }
 
-calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
+calibrate.promoter.methylation.efficiency = function(cpm, design.matrix, upper = 2.0, lower.quantile = 0.15)
 {
   # cpm = cpm.piRNA.bc 
   cpm = log2(cpm);
@@ -1503,25 +1517,29 @@ calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
   jj = which(is.na(match(rownames(yy), enriched.list)))
   #jj = c(1:nrow(yy))
   #jj = which(apply(yy, 1, mean)<5 & apply(yy, 1, mean)>-2)
-  par(mfrow=c(3, 5))
+  #par(mfrow=c(3, 5))
+  comps = c()
   for(n in 2:ncol(yy)){
     neurons = unlist(strsplit(as.character(colnames(yy)[n]), "_"))[1]
     rrs = yy[jj,n] - yy[jj,1]
     #upper = quantile(rrs, 0.60, names = FALSE); lower = quantile(rrs, 0.10, names = FALSE)
-    upper = 1; lower = quantile(rrs, 0.15, names = FALSE)
+    #upper = 10; 
+    lower = quantile(rrs, lower.quantile, names = FALSE)
     #upper = max(rrs); lower = min(rrs);
     
     jj.middle = jj[intersect(which(rrs >= lower), which(rrs <= upper))]
     
     cat("nb of non-enriched miRNAs used to calibrate the promoter efficiency -- ", length(jj.middle), "\n")
     
-    rfit = rlm((yy[jj.middle,n] - yy[jj.middle, 1]) ~ 1 )
+    rfit = rlm((yy[jj.middle, n] - yy[jj.middle, 1]) ~ 1 )
     intercepts[n] = rfit$coefficients
     
-    cat(median(rrs[which(rrs>lower & rrs< upper)]), " -- ",  intercepts[n], "\n")
-    #plot(yy[jj.middle, 1], yy[jj.middle, n], ylab = paste0('bg -', neurons), xlab = "background in N2" )
-    #abline(intercepts[n], 1, col = 'red', lwd=2.0)
+    comps = rbind(comps, cbind(rep(n, length(jj.middle)), 
+                               (yy[jj.middle, n] - yy[jj.middle, 1]), 
+                               (yy[jj.middle, n] - yy[jj.middle, 1]) - intercepts[n]))
     
+    cat(median(rrs[which(rrs>lower & rrs< upper)]), " -- ",  intercepts[n], "\n")
+        
     kk = which(design.treated$prots == colnames(yy)[n])
     for(k in kk) treated[, k] = treated[,k] - intercepts[n];
     
@@ -1533,15 +1551,21 @@ calibrate.promoter.methylation.efficiency = function(cpm, design.matrix)
                      "_miRNAs_neurons_20180525", ".Rdata"))
   nbcells = apply(as.matrix(newprop), 1, sum)
   nbcells = c(2, 6, 6, 70, 56, 15, 6, 30, 20, 107, 16, 28, 32, 220, 220)
-  
+ 
   intercepts = intercepts[-1]
   # cat(length(nbcells), "--", length(intercepts), "\n")
   
   par(mfrow=c(1, 1))
-  plot(nbcells, intercepts, log='x', xlim = c(1, 500), ylim = c(-1, 1))
+  plot(nbcells, intercepts, log='x', xlim = c(1, 500), ylim = c(-1, 1), 
+       xlab = "nb.cells", ylab = "estimated bias due to promoter efficiency")
   text(nbcells, intercepts, names(intercepts), pos=1, cex = 0.8, offset = 0.2)
   abline(h = c(-1, 0, 1), col = 'red', lwd=2.0)
   
+  par(mfrow = c(1, 2))
+  boxplot(comps[, 2] ~ comps[, 1], names = names(intercepts), las = 2, col = c(1:length(intercepts)))
+  abline(h=0, col='darkgray', lwd=2.0)
+  boxplot(comps[, 3] ~ comps[, 1], names = names(intercepts), las = 2, col = c(1:length(intercepts)))
+  abline(h=0, col='darkgray', lwd=2.0)
   #cpm.piRNA.bc.bgc = data.frame(untreated, treated, stringsAsFactors = FALSE)
   cpm.piRNA.bc.bgc = cbind(untreated, treated)
   cpm.piRNA.bc.bgc = cpm.piRNA.bc.bgc[, match(colnames(cpm), colnames(cpm.piRNA.bc.bgc))]

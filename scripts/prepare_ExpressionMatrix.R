@@ -314,25 +314,25 @@ load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAv
 Try.Calibrate.promoter.methylation.efficiency = TRUE
 if(Try.Calibrate.promoter.methylation.efficiency){
   pdfname = paste0(resDir, "/Select_panNeurons_BEFORE_background_calibration_Samples_check_examples_",  version.analysis, ".pdf")
-  pdf(pdfname, width=12, height = 10)
+  pdf(pdfname, width=18, height = 8)
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   source("miRNAseq_functions.R")
-  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix, logscale = TRUE)
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc, design.matrix)
   
   dev.off()
   
   pdfname = paste0(resDir, "/Select_panNeurons_AFTER_background_calibration_Samples_check_examples_",  version.analysis, ".pdf")
-  pdf(pdfname, width=12, height = 10)
+  pdf(pdfname, width=18, height = 8)
   par(cex =0.7, mar = c(6,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   
   source("miRNAseq_functions.R")
-  xx = calibrate.promoter.methylation.efficiency(cpm.piRNA.bc, design.matrix)
+  xx = calibrate.promoter.methylation.efficiency(cpm.piRNA.bc, design.matrix, upper = 1.2, lower.quantile = 0.15)
+  
   cpm.piRNA.bc.prot = 2^xx
   
-  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc.prot, design.matrix, logscale = FALSE)
-  #(cpm.piRNA.bc.meanrep.log2[mm, grep("_treated", colnames(cpm.piRNA.bc.meanrep.log2))])
-  #Compare.pan.neuron.vs.other.five.samples(cpm.piRNA.bc)
+  Compare.pan.neuron.vs.other.five.samples.And.check.miRNA.examples(cpm.piRNA.bc.prot, design.matrix)
+  
   dev.off()
   
 }
