@@ -34,8 +34,6 @@ version.analysis = "_20181214"
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 resDir = "../results/decomvolution_results/"
 if(!dir.exists(resDir)) dir.create(resDir)
-#testDir = paste0(resDir, "deconv_test_09_20_gcdnet_tuning_global_lambda2_cv/")
-#if(!dir.exists(testDir)) dir.create(testDir)
 
 ######################################
 ######################################
@@ -264,6 +262,13 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
     write.csv(expression.sel, 
               file = paste0("../results/final_tables_4Chiara/", 
                             "expression_matrix_used4deconvolution", version.analysis, ".csv"), col.names = TRUE, row.names = TRUE)
+    
+    kk = match(colnames(expression), colnames(expression.sel))
+    write.csv(expression[, which(is.na(kk))], 
+              file = paste0("../results/final_tables_4Chiara/", 
+                            "expression_matrix_NOTused4deconvolution_notEnriched_and_lowlyExpressed", 
+                            version.analysis, ".csv"), col.names = TRUE, row.names = TRUE)
+    
   }
  
 }
@@ -359,17 +364,19 @@ for(method in Methods2test)
   
   dev.off()
   
-  save(x, y, alphas, res, file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
+  save(x, y, alphas, keep, file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
                                         version.analysis, ".Rdata"))
   
 }
 
 if(save.deconvolution.results.for.downstream.analysis){
   
+  method = "cv.lambda.1se"
+  alpha.hyperparam = "global.alpha"
   load(file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
                      version.analysis, ".Rdata"))
   
-  tabDir = paste0(testDir, "/tables/")
+  tabDir = paste0(resDir, "deconv_results/tables_logscale/")
   if(!dir.exists(tabDir)) system(paste0('mkdir -p ', tabDir))
   
   pdfname = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", 
@@ -380,18 +387,21 @@ if(save.deconvolution.results.for.downstream.analysis){
   par(mfrow=c(1, 1))
   
   for(n in 1:length(alphas)){
+    # n = 9;
     cat("alpha -- ", alphas[n], "\n")
     res = keep[[n]];
+    
+    source("select_tuningParams_elasticNet.R")
+    res = clustering.gene.neuronClass(res);
+    
     write.csv(res, file = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam, 
-                     version.analysis, "_alpha_", alphas[n], ".csv"), row.names = TRUE, col.names = TRUE)
+                     version.analysis, "_alpha_", alphas[n], ".csv"), row.names = TRUE)
     
     cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(100)
-    
-    pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-             cluster_cols=FALSE, main = paste0("alpha = ", alphas[n], " - method : ", method), na_col = "white",
+    pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+             cluster_cols=FALSE, main = paste0("alpha = ", alphas[n], " -- ", method), na_col = "white",
              color = cols)
-    
-    
+
   }
   
   dev.off()

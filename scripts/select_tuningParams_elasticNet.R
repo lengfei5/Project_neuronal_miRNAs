@@ -616,7 +616,73 @@ if(TEST.gcdnet.global.lambda2){
   
 }
 
-
+clustering.gene.neuronClass = function(res)
+{
+  ##########################################
+  # order the genes with nb of classes expressed
+  ##########################################
+  xx = res;  
+  xx[which(is.na(xx))] = 0
+  yy = xx > 0;
+  nb.class = apply(yy, 2, sum)
+  xx = xx[, order(nb.class)]
+  
+  ##########################################
+  # regroup neuron clasess for sensory, motor, inter
+  ##########################################
+  #load(file = paste0(RdataDir, "Tables_Sample_2_Promoters_mapping_neurons_vs_neuronClasses_FractionMatrix", 
+  #                   version.Fraction.Matrix, ".Rdata"))
+  #source('miRNAseq_functions.R')
+  library("openxlsx")
+  coarseClass = read.xlsx("../data/proportion_matrix_for_Coarse_neuron_classes.xlsx", rowNames = TRUE,
+                          sheet = 1, colNames = TRUE, skipEmptyRows = TRUE, skipEmptyCols = TRUE, na.strings = "NA")
+  mm = match(c("SENSORY", "MOTOR", "INTER"), rownames(coarseClass))
+  coarseClass = as.matrix(coarseClass[mm, ])
+  
+  coarseClass[which(is.na(coarseClass))] = 0
+  coarseClass[which(coarseClass== "1?")] = 1;
+  coarseClass = data.frame(coarseClass, stringsAsFactors = TRUE)
+  cc = t(coarseClass)
+  cc = matrix(as.numeric(cc), nrow = nrow(cc), ncol = ncol(cc))
+  colnames(cc) = rownames(coarseClass)
+  rownames(cc) = colnames(coarseClass)
+  coarseClass = t(cc)
+  
+  ccs = rep(NA, nrow(xx))
+  for(m in 1:nrow(xx))
+  {
+    names = rownames(xx)[m]
+    names = unlist(strsplit(names, "[.]"))
+    ccmap = coarseClass[, match(names, colnames(coarseClass))]
+    if(length(names)>1) {ss = apply(ccmap, 1, sum);
+    }else {ss = ccmap; }
+    kk = which(ss == max(ss))[1]
+    
+    ccs[m] = rownames(coarseClass)[kk];
+  }
+  
+  o1 = order(ccs, decreasing=TRUE)
+  xx = xx[o1, ]
+  xx[which(xx==0)] = NA;
+  newres = xx;
+  
+  #TEST.newcc = FALSE
+  #if(TEST.newcc){
+  #  n = 14;
+  #  j = 2;
+  #  kk = which(cc[, j]>0)
+  #  sum(proportions[n,kk])
+  #}
+  
+  #newcc = proportions %*% cc
+  #rownames(newcc) = c("Dopaminergic","Serotonergic","Glutamatergic", "Cholinergic", "GABAergic",  "Ciliatedsensory",
+  #                    "Mechanosensory", "unc.86", "Pharyngeal", "ceh.14", "unc.42", "unc.3","ASE", "Pan.neurons")
+  #save(newcc, file = paste0(RdataDir,
+  #                          "Tables_Coarse_neuronClasses_FractionMatrix_for_Sensory_Motor_Inter", 
+  #                         version.Fraction.Matrix, ".Rdata"))
+  
+  return(newres)
+}
 
 
 
