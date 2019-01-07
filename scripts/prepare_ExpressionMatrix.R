@@ -339,7 +339,7 @@ if(Try.Calibrate.promoter.methylation.efficiency){
 
 save(cpm.piRNA.bc.prot,
      cpm.piRNA.bc, 
-     cpm.piRNA.bc.meanrep, 
+     cpm.piRNA.bc.meanrep,
      cpm.piRNA.bc.meanrep.log2,
      design.matrix, 
      file = paste0(RdataDir, 'piRANormalized_cpm.piRNAnorm_batchCorrectedCombat_calibratedProtEff_', version.table, '.Rdata'))
