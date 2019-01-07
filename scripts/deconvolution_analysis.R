@@ -13,7 +13,7 @@ library("RColorBrewer")
 source('miRNAseq_functions.R')
 
 Data.complete = TRUE
-fitting.space = "log2" ## linear or log2 transformed for expression matrix
+fitting.space = "linear" ## linear or log2 transformed for expression matrix
 
 Use.mergedFractionMatrix = TRUE
 Use.coarse.neuronClass.FractionMatrix = FALSE
@@ -29,7 +29,7 @@ version.ExprsMatrix = "miRNAs_neurons_v1_2018_03_07"
 version.Fraction.Matrix = "_miRNAs_neurons_20180525"
 version.EnrichscoreMatrix = "20180506"
 
-version.analysis = "_20181214"
+version.analysis = "_20190107"
 
 RdataDir = paste0("../results/tables_for_decomvolution/Rdata/")
 resDir = "../results/decomvolution_results/"
@@ -113,6 +113,7 @@ if(!Use.mergedExpressionMatrix){
   
   #load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
   load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNAnorm_batchCorrectedCombat_calibratedProtEff_', version.ExprsMatrix, '.Rdata'))
+  
   cpm.piRNA.bc = log2(cpm.piRNA.bc.prot)
   cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
   
