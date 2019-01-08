@@ -123,6 +123,7 @@ if(!Use.mergedExpressionMatrix){
     ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
     ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
     colnames(xx) = c('whole.body', 'background', ncs)
+    expression = xx[, -c(1)] # ignore the gene expression in the whole body
     
   }else{
     source('miRNAseq_functions.R')
@@ -134,12 +135,20 @@ if(!Use.mergedExpressionMatrix){
     ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
     colnames(xx) = c('whole.body', 'background', ncs)
     
-    cpm.piRNA.bc.vars = variance.biological.replicates(cpm.piRNA.bc.prot)
+    expression = xx[, -c(1)]
     
-    plot(cpm.piRNA.bc.meanrep, cpm.piRNA.bc.vars)
+    expr.vars = variance.biological.replicates(cpm.piRNA.bc.prot)
+    xx = data.frame(expr.vars[, -1])
+    ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+    colnames(xx) = c('background', ncs)
+    
+    expr.vars = xx;
+    
+    plot(as.vector(as.matrix(expression)), as.vector(as.matrix(expr.vars)), log = "xy")
+    points(seq(1, 10^6, by = 100), seq(1, 10^6, by = 100)^1.775*exp(-2.0), type = "l", col= 'red')
     
   }
-  
   
   #write.csv(cpm.piRNA.bc, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_replicates.csv")
   #write.csv(cpm.piRNA.bc.meanrep, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_averageRepliciates.csv")
@@ -148,8 +157,7 @@ if(!Use.mergedExpressionMatrix){
   # then e' = 0 if e'<0 or e'<1; 
   # this transformation is to scale the range for each gene so that all data fall into the same range and e' should still follow the positive constrain 
   # meanwhile using ratio between expression and background to filter non-expressed ones  
-  ####################
-  expression = xx[, -c(1)] # ignore the gene expression in the whole body
+  ###################
   
   Save.table.for.Chiara = FALSE
   if(Save.table.for.Chiara){
@@ -161,7 +169,7 @@ if(!Use.mergedExpressionMatrix){
   
 }else{
   source('miRNAseq_functions.R')
-  newExprM = expressionMatrix.grouping(xx) 
+  newExprM = expressionMatrix.grouping(xx)
 }
 
 ########################################################
@@ -211,7 +219,6 @@ if(Manually.unifiy.sample.names.forMatrix){
     
     yy = yy[-1, ]
     expression = yy;
-    
   }
   
   save(expression, proportions, file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
@@ -221,9 +228,12 @@ if(Manually.unifiy.sample.names.forMatrix){
   #proportions.sel = proportions[index.sel, ]
 }
 
-###############################
+########################################################
+########################################################
+# Section :
 # select genes of intereset and match sample orders
-###############################
+########################################################
+########################################################
 load(file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
                      version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
                      fitting.space,".Rdata"))
