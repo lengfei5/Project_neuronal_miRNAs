@@ -341,6 +341,10 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
   
+  weights = expr.vars[, match(colnames(y), colnames(expr.vars))]
+  weights = weights[match(rownames(y), rownames(weights)), ]
+  weights = (1/weights)^0.25
+  
 }else{
   # write.csv(x, file = "/Volumes/groups/cochella/Chiara/table_cellNbs_in_Sensory_Motor_Inter_for_14_Samples.csv")
   pdfname = paste0(testDir, "/deconv_test", version.analysis, 
@@ -382,7 +386,7 @@ Methods2test = c("cv.lambda.1se")
 alphas = c(seq(0.1, 1.0, by= 0.1))
 #alphas = c(0.1)
 lambda = 10^seq(-3, 3, length.out = 500)
-nlambda = 400;
+nlambda = 500;
 
 # make a folder for the result
 if(TEST.glmnet.gene.specific.alpha) {
@@ -408,8 +412,8 @@ for(method in Methods2test)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7,
-                                      Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
+  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
+                                                                    Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
   dev.off()
   

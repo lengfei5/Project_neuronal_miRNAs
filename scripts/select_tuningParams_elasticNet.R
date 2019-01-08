@@ -127,6 +127,7 @@ select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit,
 ########################################################
 run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0.1), lambda = NULL, nfold = 10, 
                                                nlambda = 100, intercept = TRUE, standardize = FALSE,
+                                               weights = NULL,
                                                Gene.Specific.Alpha = FALSE,  
                                                method = "cv.lambda.1se",   
                                                plot.cluster.col = FALSE,
@@ -139,6 +140,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
   # basic arguments for cv.glmnet and glmnet
   #intercept=TRUE
   #standardize=TRUE ### standardize matrix of motif occurrence makes more sense because the absolute number of motif occurrence is not precise.
+  if(is.null(weights)){ weights = matrix(1, nrow = nrow(y), ncol = ncol(y));}
   standardize.response=FALSE
   grouped = FALSE
   cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
@@ -154,7 +156,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
     for(alpha in alphas)
     {
       cat("global alpha --", alpha, "----------\n")
-      # alpha = 0.7; lambda = NULL; nlambda = 200; method = "bic"
+      # alpha = 0.9; lambda = NULL; nlambda = 200; method = "bic"
       
       res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
       colnames(res) = colnames(y)
@@ -162,41 +164,52 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
       set.seed(1)
       for(n in 1:ncol(y))
       {
-        # n = 1
+        # n = 7
+        wg = weights[,n];
         if(is.null(lambda)){
-          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0,
+          cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0, 
+                           weights = wg,
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE) 
           
         }else{
           cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
+                           weights = wg,
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
         }
         
+        #cat("  -- ", colnames(y)[n], "\n")
         #par(mfrow= c(1,1))
         # plot(cv.fit, main = colnames(y)[n])
         
-        fit=glmnet(x,y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
+        fit=glmnet(x, y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
+                   weights = wg,
                    standardize=standardize, standardize.response=standardize.response, intercept=intercept)
         
         myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
         
-        res[, n] = as.numeric(myCoefs)[-1]
-        
+        if(intercept){
+          res[, n] = as.numeric(myCoefs)[-1] 
+        }else{
+          res[, n] = as.numeric(myCoefs)
+        }
         #cat("---------------\n", colnames(res)[n], ":\n", 
         #    paste0(rownames(res)[which(res[,n]>0)], collapse = "\n"), "\n",
         #    "---------------\n")
       }
-      
-      if( ! plot.cluster.col){
-        res[which(res==0)] = NA;
-        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
-                 color = cols)
+      if(!all(res==0)){
+        if( ! plot.cluster.col){
+          res[which(res==0)] = NA;
+          pheatmap(log2(res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                   cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                   color = cols)
+        }else{
+          pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                   cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                   color = cols)
+          res[which(res==0)] = NA;
+        }
       }else{
-        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
-                 color = cols)
-        res[which(res==0)] = NA;
+        cat("-- Only Zeros found --\n")
       }
       
       results[[which(alphas==alpha)]] = res; 

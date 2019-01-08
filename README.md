@@ -42,9 +42,11 @@ This reprosition is for the deconvolution analysis for Chiara's project
           The background model here is : Yg,s = Bg,0 + delta_Bg,s + alpha_g,s * Cg,s where the delta_Bg,s should be alway negative or close to zero. 
 
   - [ ] Test again the linear scale fitting  
-    - [ ] Integrate the sample sample variance as weights into into the linear model  
-        Here after checking the different variances from samples, we just fit the robust liner regression given the clear linear dependency in log scale
-     
+    - [x] Integrate the sample sample variance as weights into into the linear model  
+        Here after checking the different variances from samples, we just fit the robust liner regression given the clear linear dependency in log scale;
+        However, the global trend of variances make the weights extremely unbalanced; 
+        So give up this step and just use default equal weights now
+        
   - [ ] Improve the model fitting, especially for known examples, lsy-6 
     - [ ] test group lasso, manually define groups using correction
     - [ ] post-filtering (i.e. removing non-significant ones)
