@@ -114,15 +114,32 @@ if(!Use.mergedExpressionMatrix){
   #load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNA_batchCorrectedCombat_reAveraged_', version.ExprsMatrix, '.Rdata'))
   load(file = paste0(RdataDir, 'piRANormalized_cpm.piRNAnorm_batchCorrectedCombat_calibratedProtEff_', version.ExprsMatrix, '.Rdata'))
   
-  cpm.piRNA.bc = log2(cpm.piRNA.bc.prot)
-  cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+  if(fitting.space == "log2"){
+    cpm.piRNA.bc = log2(cpm.piRNA.bc.prot)
+    cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc)
+    jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
+    total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
+    xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
+    ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+    colnames(xx) = c('whole.body', 'background', ncs)
+    
+  }else{
+    source('miRNAseq_functions.R')
+    cpm.piRNA.bc.meanrep = average.biological.replicates(cpm.piRNA.bc.prot)
+    jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
+    total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
+    xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
+    ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
+    colnames(xx) = c('whole.body', 'background', ncs)
+    
+    cpm.piRNA.bc.vars = variance.biological.replicates(cpm.piRNA.bc.prot)
+    
+    plot(cpm.piRNA.bc.meanrep, cpm.piRNA.bc.vars)
+    
+  }
   
-  jj = grep('_untreated', colnames(cpm.piRNA.bc.meanrep))
-  total = apply(cpm.piRNA.bc.meanrep[, jj], 1, median)
-  xx = data.frame(total, cpm.piRNA.bc.meanrep[, -jj])
-  ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
-  ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
-  colnames(xx) = c('whole.body', 'background', ncs)
   
   #write.csv(cpm.piRNA.bc, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_replicates.csv")
   #write.csv(cpm.piRNA.bc.meanrep, file = "/Volumes/groups/cochella/Chiara/table_normalized_piRNA_batchCorrected_averageRepliciates.csv")

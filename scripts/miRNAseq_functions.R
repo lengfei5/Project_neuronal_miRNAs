@@ -626,7 +626,62 @@ average.biological.replicates = function(cpm)
   }
   
   return(cpm.mean)
+}
+
+variance.biological.replicates = function(cpm)
+{
+  # cpm = cpm.piRNA.bc.prot;
+  samples = sapply(colnames(cpm), find.replicates.by.removing.ID, USE.NAMES = FALSE)
+  samples[grep("_untreated", samples)] = "whole.body"
+  samples.uniq = unique(samples)
   
+  if(length(samples.uniq) == length(samples)){
+    cat('---no replicates exist---')
+  }else{
+    cpm.mean = matrix(NA, nrow = nrow(cpm), ncol=length(samples.uniq))
+    rownames(cpm.mean) = rownames(cpm)
+    colnames(cpm.mean) = samples.uniq;
+    
+    cpm.vars = cpm.mean;
+    
+    for(n in 1:ncol(cpm.mean))
+    {
+      kk = which(samples == colnames(cpm.mean)[n])
+      if(length(kk)>1){
+        cpm.mean[ ,n] = apply(as.matrix(cpm[,kk]), 1, median)
+        cpm.vars[, n] = apply(as.matrix(cpm[,kk]), 1, var)
+      }else{
+        if(length(kk)==1) cpm.mean[, n] = cpm[,kk]
+      }
+    }
+  }
+  
+  cpm.vars[which(cpm.vars<=0)] = NA;
+  
+  Check.variance.across.samples = FALSE
+  if(Check.variance.across.samples){
+    xlim = range(cpm.mean)
+    ylim = range(cpm.vars, na.rm = TRUE)
+    
+    plot(1, 1, type = "n", xlim = xlim, ylim = ylim, log = "xy", xlab = "mean in liner scale", ylab = "variance in linear scale")
+    for(n in 1:ncol(cpm.vars)){
+      points(cpm.mean[,n], cpm.vars[,n], col = n, cex=0.4)
+    }
+    points(xlim, (xlim^2*0.1), type = "l", col = 'darkblue', lwd=2.0)
+  
+  }
+  
+  x = log(as.vector(cpm.mean))
+  y = log(as.vector(cpm.vars))
+  jj = which(!is.na(x) & !is.na(y))
+  x = x[jj]; y = y[jj];
+  plot(x, y, log='', cex=0.5)
+  library(MASS)
+  fit = rlm(y ~ x)
+  abline(fit$coefficients[1], fit$coefficients[2])
+  
+  cpm.vars.hat = cpm.mean^fit$coefficients[2] * exp(fit$coefficients[1]) 
+  return(cpm.vars.hat)
 }
 
 
