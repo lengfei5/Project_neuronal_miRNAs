@@ -139,7 +139,7 @@ if(!Use.mergedExpressionMatrix){
     
     expr.vars = variance.biological.replicates(cpm.piRNA.bc.prot)
     xx = data.frame(expr.vars[, -1])
-    ncs = sapply(colnames(xx)[-c(1:2)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
+    ncs = sapply(colnames(xx)[-c(1)], function(x) unlist(strsplit(x, "_"))[2], USE.NAMES = FALSE)
     ncs = sapply(ncs, function(x) gsub("*.neurons", "", x), USE.NAMES = FALSE)
     colnames(xx) = c('background', ncs)
     
@@ -203,6 +203,11 @@ if(Manually.unifiy.sample.names.forMatrix){
   # if fitting in log2 scale, then the log2(sample/background) is used; in this case, the coefficients must be also positive
   ###############################
   if(fitting.space == "linear"){
+    
+    expr.vars = t(expr.vars)
+    print(cbind(rownames(expr.vars), newSampleNames.expr))
+    rownames(expr.vars) = newSampleNames.expr
+    
     if(add.background.sample.in.fitting.linear.space){
       yy = proportions;
       yy = rbind(rep(0, ncol(proportions)), proportions)
@@ -211,6 +216,11 @@ if(Manually.unifiy.sample.names.forMatrix){
       rownames(yy) = c("background", rownames(proportions))
       proportions = yy
     }
+    
+    save(expression, proportions, expr.vars, file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
+                                                version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
+                                                fitting.space,".Rdata"))
+    
   }else{
     yy = expression;
     # log2 (expresion/background)
@@ -219,13 +229,12 @@ if(Manually.unifiy.sample.names.forMatrix){
     
     yy = yy[-1, ]
     expression = yy;
+    
+    save(expression, proportions, file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
+                                                version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
+                                                fitting.space,".Rdata"))
   }
   
-  save(expression, proportions, file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
-                                              version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
-                                              fitting.space,".Rdata"))
-  #index.sel = c(13, 2, 1, 3, 6, 5, 7, 8, 9, 4, 10, 11)
-  #proportions.sel = proportions[index.sel, ]
 }
 
 ########################################################
@@ -237,6 +246,7 @@ if(Manually.unifiy.sample.names.forMatrix){
 load(file = paste0(RdataDir, "Expression_Fraction_Matrix_withBackground_cleaed", 
                      version.Fraction.Matrix,"_", version.ExprsMatrix, "fitting_scale", 
                      fitting.space,".Rdata"))
+exprThreshold.pan.vs.bg.log2 = 2.0
 
 # use coarse neuron group or not
 if(Use.coarse.neuronClass.FractionMatrix){
@@ -252,12 +262,20 @@ enriched.list = colnames(enrich.matrix.sel)
 
 mm = match((enriched.list), colnames(expression))
 expression.sel = expression[, mm]
+
 if(fitting.space == "log2"){
   sel.pan.neurons = which(expression.sel[which(rownames(expression.sel)=="Pan.neurons"), ] > 1)
   expression.sel = expression.sel[, sel.pan.neurons]
+}else{
+  pans = expression.sel[which(rownames(expression.sel)=="Pan.neurons"), ];
+  bgs = expression.sel[which(rownames(expression.sel)=="background"), ];
+  rrs = log2(pans/bgs)
+  rrs[order(rrs)]
+  
+  sel.pan.neurons = which(log2(pans/bgs) > exprThreshold.pan.vs.bg.log2)
+  
+  expression.sel = expression.sel[, sel.pan.neurons]
 }
-
-#expression.sel = log2(expression.sel)
 
 sels = match(rownames(expression.sel), rownames(proportions))
 proportions.sel = proportions[sels, ]
@@ -310,14 +328,16 @@ if(Check.ProprotionMatrix.ExpressionMatrix){
 x = as.matrix(proportions.sel)
 y = as.matrix(expression.sel)
 
-## force value to be zero if they are lower than the background
-y[y<0] = 0
+if(fitting.space == "log2"){
+  ## force value to be zero if they are lower than the background
+  y[y<0] = 0
+}
 
 if(!Use.coarse.neuronClass.FractionMatrix){
   
   x = x >0
   Example2test = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
-  Example2test = c(Example2test, setdiff(colnames(y), Example2test))
+  #Example2test = c(Example2test, setdiff(colnames(y), Example2test))
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
   
@@ -346,6 +366,7 @@ rownames(res) = colnames(x)
 #x.ms = apply(x, 2, sum)
 #x = x[, which(x.ms>0)]
 #x = x>0
+
 ##########################################
 # glmnet with global alpha parameter or gene-specific alpha parameters
 ##########################################
@@ -358,9 +379,9 @@ save.deconvolution.results.for.downstream.analysis = TRUE
 #Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
 #Methods2test = c("cv.lambda.1se", "bic")
 Methods2test = c("cv.lambda.1se")
-alphas = c(seq(0.3, 1.0, by= 0.05))
+alphas = c(seq(0.1, 1.0, by= 0.1))
 #alphas = c(0.1)
-lambda = 10^seq(-3, 3, length.out = 400)
+lambda = 10^seq(-3, 3, length.out = 500)
 nlambda = 400;
 
 # make a folder for the result
@@ -370,7 +391,7 @@ if(TEST.glmnet.gene.specific.alpha) {
   alpha.hyperparam = "global.alpha"
 }
 
-testDir = paste0(resDir, "deconv_results")
+testDir = paste0(resDir, "deconv_results_linear")
     
 if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
 
