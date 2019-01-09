@@ -340,7 +340,7 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   
   x = x >0
   Example2test = c("lsy-6", "mir-791", "mir-793",  "mir-792","mir-1821", "mir-83", "mir-124")
-  #Example2test = c(Example2test, setdiff(colnames(y), Example2test))
+  Example2test = c(Example2test, setdiff(colnames(y), Example2test))
   jj2test = match(Example2test, colnames(y))
   y = y[, jj2test[which(!is.na(jj2test)==TRUE)]]
   
@@ -398,7 +398,7 @@ if(TEST.glmnet.gene.specific.alpha) {
   alpha.hyperparam = "global.alpha"
 }
 
-testDir = paste0(resDir, "deconv_results_linear_groupLasso")
+testDir = paste0(resDir, "deconv_results_linear")
     
 if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
 
@@ -415,11 +415,11 @@ for(method in Methods2test)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  #keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
-  #                                                                  Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
+  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
+                                                                    Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
-  source("select_tuningParams_elasticNet.R")
-  keep = run.gglasso.select.tuning.parameters(x, y, cor.cutoff=seq(1, 0.5, by= -0.1), method = method, lambda = lambda, intercept = TRUE, nfold = 7)
+  #source("select_tuningParams_elasticNet.R")
+  #keep = run.gglasso.select.tuning.parameters(x, y, cor.cutoff=seq(1, 0.5, by= -0.1), method = method, lambda = lambda, intercept = TRUE, nfold = 7)
                                                     
                                              
   dev.off()

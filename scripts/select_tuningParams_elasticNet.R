@@ -165,6 +165,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
       for(n in 1:ncol(y))
       {
         # n = 7
+        cat("  -- ", colnames(y)[n], "\n")
         wg = weights[,n];
         if(is.null(lambda)){
           cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0, 
@@ -177,7 +178,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
                            standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
         }
         
-        #cat("  -- ", colnames(y)[n], "\n")
+        
         #par(mfrow= c(1,1))
         # plot(cv.fit, main = colnames(y)[n])
         
