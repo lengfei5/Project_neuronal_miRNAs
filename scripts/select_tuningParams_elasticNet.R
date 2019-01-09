@@ -335,6 +335,101 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
   
 }
 
+
+########################################################
+########################################################
+# Section : test group lasso
+# 
+########################################################
+########################################################
+run.gglasso.select.tuning.parameters = function(x, y, lambda = NULL, nfold = 10, 
+                                               nlambda = 100, intercept = TRUE, 
+                                               method = "cv.lambda.1se",   
+                                               plot.cluster.col = FALSE,
+                                               plot.crit.bic = TRUE)
+{
+  library(gglasso)
+  library(zoo)
+  library("pheatmap")
+  library("RColorBrewer")
+  
+  cols = colorRampPalette(rev(brewer.pal(n = 7, name="RdYlBu")))(100)
+  
+  ##########################################
+  # use correlation to determine the groups 
+  ##########################################
+  dissimilarity <- 1 - cor((x))
+  distance <- as.dist(dissimilarity) 
+  
+  ###############################
+  # different cutoffs used to determine groups 
+  # so start the loop with alphas 
+  ###############################
+  results = list();
+  
+  #ii.alpha = 0;
+  for(alpha in alphas)
+  {
+    cat("global alpha --", alpha, "----------\n")
+    # alpha = 0.9; lambda = NULL; nlambda = 200; method = "bic"
+    
+    res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
+    colnames(res) = colnames(y)
+    rownames(res) = colnames(x)
+    set.seed(1)
+    for(n in 1:ncol(y))
+    {
+      # n = 7
+      
+      if(is.null(lambda)){
+        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0, 
+                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+      }else{
+        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
+                         weights = wg,
+                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+      }
+      
+      #cat("  -- ", colnames(y)[n], "\n")
+      #par(mfrow= c(1,1))
+      # plot(cv.fit, main = colnames(y)[n])
+      
+      fit=glmnet(x, y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
+                 weights = wg,
+                 standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+      
+      myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
+      
+      if(intercept){
+        res[, n] = as.numeric(myCoefs)[-1] 
+      }else{
+        res[, n] = as.numeric(myCoefs)
+      }
+    
+    }
+    if(!all(res==0)){
+      if( ! plot.cluster.col){
+        res[which(res==0)] = NA;
+        pheatmap(log2(res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 color = cols)
+      }else{
+        pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 color = cols)
+        res[which(res==0)] = NA;
+      }
+    }else{
+      cat("-- Only Zeros found --\n")
+    }
+    
+    results[[which(alphas==alpha)]] = res; 
+  }
+  
+  return(results)
+  
+}
+
 ########################################################
 ########################################################
 # Section : test gcdnet

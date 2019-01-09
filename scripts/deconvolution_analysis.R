@@ -412,9 +412,13 @@ for(method in Methods2test)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
   par(mfrow=c(1, 1))
   
-  keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
-                                                                    Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
+  #keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
+  #                                                                  Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
+  source("select_tuningParams_elasticNet.R")
+  keep = run.gglasso.select.tuning.parameters(x, y, method = method, lambda = lambda, intercept = TRUE, nfold = 7)
+                                                    
+                                             
   dev.off()
   
   save(x, y, alphas, keep, file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,

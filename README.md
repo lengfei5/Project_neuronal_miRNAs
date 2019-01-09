@@ -41,11 +41,13 @@ This reprosition is for the deconvolution analysis for Chiara's project
           - there are two things: the sample-specific background due to the background miRNAs composition bias; which is in principle correlated to the sample size; the second thing is the promoter-sepecific efficiencies, which can not be corrected. 
           The background model here is : Yg,s = Bg,0 + delta_Bg,s + alpha_g,s * Cg,s where the delta_Bg,s should be alway negative or close to zero. 
 
-  - [ ] Test again the linear scale fitting  
-    - [x] Integrate the sample sample variance as weights into into the linear model  
+  - [x] Test again the linear scale fitting  
+  
+  - [ ] Integrate the sample sample variance as weights into into the linear model  
         Here after checking the different variances from samples, we just fit the robust liner regression given the clear linear dependency in log scale;
         However, the global trend of variances make the weights extremely unbalanced; 
         So give up this step and just use default equal weights now
+        Probably try this again, because this is still a concern for me.
         
   - [ ] Improve the model fitting, especially for known examples, lsy-6 
     - [ ] test group lasso, manually define groups using correction
