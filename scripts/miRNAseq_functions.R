@@ -658,6 +658,21 @@ variance.biological.replicates = function(cpm)
   
   cpm.vars[which(cpm.vars<=0)] = NA;
   
+  for(n in 1:ncol(cpm.mean)){
+    x = (as.vector(cpm.mean[,n]))
+    y = (as.vector(cpm.vars[,n]))
+    jj = which(!is.na(x) & !is.na(y))
+    x = x[jj]; y = y[jj];
+    plot((x), (y), log='xy', cex=0.5)
+    library(MASS);
+    library(stats)
+    fit = loess(y ~ x)
+    #abline(fit$coefficients[1], fit$coefficients[2])
+    # points(range(exp(x)), range(exp(x)^fit$coefficients[2] * exp(fit$coefficients[1])), type = "l", col = 'red')
+    points(range((x)), predict(fit, range(x)), type = "l", col = 'red', lwd =2 )
+    cat(fit$coefficients[1], '--',  fit$coefficients[2], "\n")
+  }
+  
   Check.variance.across.samples = FALSE
   if(Check.variance.across.samples){
     xlim = range(cpm.mean)
@@ -668,17 +683,9 @@ variance.biological.replicates = function(cpm)
       points(cpm.mean[,n], cpm.vars[,n], col = n, cex=0.4)
     }
     points(xlim, (xlim^2*0.1), type = "l", col = 'darkblue', lwd=2.0)
-  
+    
   }
   
-  x = log(as.vector(cpm.mean))
-  y = log(as.vector(cpm.vars))
-  jj = which(!is.na(x) & !is.na(y))
-  x = x[jj]; y = y[jj];
-  plot(x, y, log='', cex=0.5)
-  library(MASS)
-  fit = rlm(y ~ x)
-  abline(fit$coefficients[1], fit$coefficients[2])
   
   cpm.vars.hat = cpm.mean^fit$coefficients[2] * exp(fit$coefficients[1]) 
   return(cpm.vars.hat)

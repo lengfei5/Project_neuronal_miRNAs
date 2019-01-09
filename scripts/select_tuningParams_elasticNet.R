@@ -364,9 +364,15 @@ run.gglasso.select.tuning.parameters = function(x, y, cor.cutoff=seq(1, 0.5, by=
   #cutoff.dist = 1 - cor.cutoff
   cluster.groups <- hclust(distance, method="complete") 
   
-  #groups <- cutree(cluster.groups, h = 0.2)
-  #plot(cluster.groups, main="Dissimilarity = 1 - Correlation", xlab="") 
-  #rect.hclust(cluster.groups, k = length(unique(groups)), border="red") 
+  test.grouping.cutoff = FALSE
+  if(test.grouping.cutoff){
+    cutoff = 0.8;
+    groups <- cutree(cluster.groups, h = (1-cutoff))
+    plot(cluster.groups, main="Dissimilarity = 1 - Correlation", xlab="") 
+    rect.hclust(cluster.groups, k = length(unique(groups)), border="red") 
+    
+    cat(length(unique(groups)))
+  }
   
   ###############################
   # different cutoffs used to determine groups 
@@ -378,11 +384,12 @@ run.gglasso.select.tuning.parameters = function(x, y, cor.cutoff=seq(1, 0.5, by=
   for(cutoff in cor.cutoff)
   {
     cat("correlation cutoff --", cutoff, "----------\n")
-    # cutoff = 0.8
+    # cutoff = 0.7; intercept = TRUE; nfold = 7;
     grp=cutree(cluster.groups, h = (1 - cutoff))
     #fit=gglasso(x=X,y=Y,group=grp,loss='ls')
+    #grp = rep(c(1:7), each = 5)
     
-    res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
+    res = matrix(NA, nrow = ncol(x), ncol = ncol(y))
     colnames(res) = colnames(y)
     rownames(res) = colnames(x)
     set.seed(1)
@@ -407,7 +414,17 @@ run.gglasso.select.tuning.parameters = function(x, y, cor.cutoff=seq(1, 0.5, by=
   
       fit=gglasso(x, y[,n], group = grp, lambda=cv.fit$lambda, loss = 'ls', intercept = intercept)
       
-      myCoefs <- coef(fit, s=cv.fit$lambda.1se);
+      if(method == "cv.lambda.1se") {
+        myCoefs <- coef(fit, s=cv.fit$lambda.1se);
+      }else{
+        if(method == "cv.lambda.min"){
+          myCoefs <- coef(fit, s=cv.fit$lambda.min);
+        }else{
+          cat('-- unknown method for select tuning parameter lambda -- \n')
+        }
+          
+      }
+      
       #myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
       
       if(intercept){ res[, n] = as.numeric(myCoefs)[-1]; }
