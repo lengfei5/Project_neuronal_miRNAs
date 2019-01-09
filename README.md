@@ -49,8 +49,11 @@ This reprosition is for the deconvolution analysis for Chiara's project
         So give up this step and just use default equal weights now
         Probably try this again, because this is still a concern for me.
         
-  - [ ] Improve the model fitting, especially for known examples, lsy-6 
-    - [ ] test group lasso, manually define groups using correction
+  - [ ] Improve the model fitting, especially for known examples, lsy-6
+    - [x] test group lasso, manually define groups using correction
+          test `gglasso` R package and define gropus using feature correation; there are some improvment in the grouping effect but not quite dramatic;
+          some known groups (e.g. AFD and BAG) were already caputred by the `glmnet`
+          
     - [ ] post-filtering (i.e. removing non-significant ones)
   
   - [ ] Optimize the fitting and parameter

@@ -211,9 +211,12 @@ if(Manually.unifiy.sample.names.forMatrix){
     if(add.background.sample.in.fitting.linear.space){
       yy = proportions;
       yy = rbind(rep(0, ncol(proportions)), proportions)
-      yy = cbind(rep(1, nrow(yy)), yy)
-      colnames(yy) = c("C0", colnames(proportions))
+      #yy = cbind(rep(1, nrow(yy)), yy)
+      #colnames(yy) = c("C0", colnames(proportions))
       rownames(yy) = c("background", rownames(proportions))
+      ss = apply(yy, 2, sum)
+      yy = yy[, which(ss>0)]
+      
       proportions = yy
     }
     
@@ -374,7 +377,7 @@ rownames(res) = colnames(x)
 ##########################################
 # glmnet with global alpha parameter or gene-specific alpha parameters
 ##########################################
-require(glmnet)
+#require(glmnet)
 library("pheatmap")
 library("RColorBrewer")
 TEST.glmnet.gene.specific.alpha = FALSE
@@ -395,7 +398,7 @@ if(TEST.glmnet.gene.specific.alpha) {
   alpha.hyperparam = "global.alpha"
 }
 
-testDir = paste0(resDir, "deconv_results_linear")
+testDir = paste0(resDir, "deconv_results_linear_groupLasso")
     
 if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
 
@@ -416,7 +419,7 @@ for(method in Methods2test)
   #                                                                  Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
   
   source("select_tuningParams_elasticNet.R")
-  keep = run.gglasso.select.tuning.parameters(x, y, method = method, lambda = lambda, intercept = TRUE, nfold = 7)
+  keep = run.gglasso.select.tuning.parameters(x, y, cor.cutoff=seq(1, 0.5, by= -0.1), method = method, lambda = lambda, intercept = TRUE, nfold = 7)
                                                     
                                              
   dev.off()

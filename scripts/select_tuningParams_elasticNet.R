@@ -342,7 +342,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
 # 
 ########################################################
 ########################################################
-run.gglasso.select.tuning.parameters = function(x, y, lambda = NULL, nfold = 10, 
+run.gglasso.select.tuning.parameters = function(x, y, cor.cutoff=seq(1, 0.5, by=-0.1), lambda = NULL, nfold = 10, 
                                                nlambda = 100, intercept = TRUE, 
                                                method = "cv.lambda.1se",   
                                                plot.cluster.col = FALSE,
@@ -360,6 +360,12 @@ run.gglasso.select.tuning.parameters = function(x, y, lambda = NULL, nfold = 10,
   ##########################################
   dissimilarity <- 1 - cor((x))
   distance <- as.dist(dissimilarity) 
+  #cutoff.dist = 1 - cor.cutoff
+  cluster.groups <- hclust(distance, method="complete") 
+  
+  #groups <- cutree(cluster.groups, h = 0.2)
+  #plot(cluster.groups, main="Dissimilarity = 1 - Correlation", xlab="") 
+  #rect.hclust(cluster.groups, k = length(unique(groups)), border="red") 
   
   ###############################
   # different cutoffs used to determine groups 
@@ -368,10 +374,12 @@ run.gglasso.select.tuning.parameters = function(x, y, lambda = NULL, nfold = 10,
   results = list();
   
   #ii.alpha = 0;
-  for(alpha in alphas)
+  for(cutoff in cor.cutoff)
   {
-    cat("global alpha --", alpha, "----------\n")
-    # alpha = 0.9; lambda = NULL; nlambda = 200; method = "bic"
+    cat("correlation cutoff --", cutoff, "----------\n")
+    # cutoff = 0.8
+    grp=cutree(cluster.groups, h = (1 - cutoff))
+    #fit=gglasso(x=X,y=Y,group=grp,loss='ls')
     
     res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
     colnames(res) = colnames(y)
@@ -379,39 +387,39 @@ run.gglasso.select.tuning.parameters = function(x, y, lambda = NULL, nfold = 10,
     set.seed(1)
     for(n in 1:ncol(y))
     {
-      # n = 7
-      
+      # n = 2
       if(is.null(lambda)){
-        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0, 
-                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+        cv.fit = cv.gglasso(x, y[,n], group=grp, pred.loss = 'L2', loss = 'ls', nlambda=nlambda, nfolds = nfold, intercept = intercept)
+        #cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, nlambda=nlambda, standardize=standardize, lower.limits = 0, 
+        #                 standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
       }else{
-        cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
-                         weights = wg,
-                         standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
+        cv.fit = cv.gglasso(x, y[,n], group=grp, pred.loss = 'L2', loss = 'ls', lambda = lambda, nfolds = nfold, intercept = intercept)
+        #cv.fit=cv.glmnet(x, y[,n], family='gaussian', alpha=alpha, lambda = lambda, standardize=standardize, lower.limits = 0,
+        #                 weights = wg,      
+        #                 standardize.response=standardize.response, intercept=intercept, grouped = FALSE)
       }
       
-      #cat("  -- ", colnames(y)[n], "\n")
+      cat("  -- ", colnames(y)[n], "\n")
       #par(mfrow= c(1,1))
       # plot(cv.fit, main = colnames(y)[n])
+      #lmbda=fit.cv$lambda.1se
+  
+      fit=gglasso(x, y[,n], group = grp, lambda=cv.fit$lambda, loss = 'ls', intercept = intercept)
       
-      fit=glmnet(x, y[,n], alpha=alpha, lambda=cv.fit$lambda,family='gaussian', lower.limits = 0,
-                 weights = wg,
-                 standardize=standardize, standardize.response=standardize.response, intercept=intercept)
+      myCoefs <- coef(fit, s=cv.fit$lambda.1se);
+      #myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
       
-      myCoefs = select.tuning.parameters.for.glmnet(x, y[,n], alpha, fit, cv.fit, method = method)
-      
-      if(intercept){
-        res[, n] = as.numeric(myCoefs)[-1] 
-      }else{
-        res[, n] = as.numeric(myCoefs)
-      }
+      if(intercept){ res[, n] = as.numeric(myCoefs)[-1]; }
+      else{res[, n] = as.numeric(myCoefs);}
     
     }
+    
+    # plot the fitting
     if(!all(res==0)){
       if( ! plot.cluster.col){
         res[which(res==0)] = NA;
         pheatmap(log2(res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
-                 cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
+                 cluster_cols=FALSE, main = paste0("correlation cutoff = ", cutoff, " - method : ", method), na_col = "gray30",
                  color = cols)
       }else{
         pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
@@ -423,7 +431,7 @@ run.gglasso.select.tuning.parameters = function(x, y, lambda = NULL, nfold = 10,
       cat("-- Only Zeros found --\n")
     }
     
-    results[[which(alphas==alpha)]] = res; 
+    results[[which(cor.cutoff==cutoff)]] = res; 
   }
   
   return(results)
