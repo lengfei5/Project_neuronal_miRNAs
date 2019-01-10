@@ -16,7 +16,7 @@ Data.complete = TRUE
 fitting.space = "log2" ## linear or log2 transformed for expression matrix
 
 Use.mergedFractionMatrix = TRUE
-Use.coarse.neuronClass.FractionMatrix = FALSE
+Use.coarse.neuronClass.FractionMatrix = TRUE
 
 add.background.sample.in.fitting.linear.space = TRUE
 
@@ -388,11 +388,11 @@ library("RColorBrewer")
 TEST.glmnet.gene.specific.alpha = FALSE
 save.deconvolution.results.for.downstream.analysis = TRUE
 
-Test.groupLasso = TRUE;
+Test.groupLasso = FALSE;
 
 #Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
 #Methods2test = c("cv.lambda.1se", "bic")
-Methods2test = c("cv.lambda.min")
+Methods2test = c("cv.lambda.1se")
 alphas = c(seq(0.1, 1.0, by= 0.1))
 #alphas = c(0.1)
 lambda = 10^seq(-3, 3, length.out = 500)

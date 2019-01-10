@@ -43,11 +43,12 @@ This reprosition is for the deconvolution analysis for Chiara's project
 
   - [x] Test again the linear scale fitting  
   
-  - [ ] Integrate the sample sample variance as weights into into the linear model  
+  - [x] Integrate the sample sample variance as weights into into the linear model  
         Here after checking the different variances from samples, we just fit the robust liner regression given the clear linear dependency in log scale;
         However, the global trend of variances make the weights extremely unbalanced; 
         So give up this step and just use default equal weights now
         Probably try this again, because this is still a concern for me.
+        No success again
         
   - [ ] Improve the model fitting, especially for known examples, lsy-6
     - [x] test group lasso, manually define groups using correction
