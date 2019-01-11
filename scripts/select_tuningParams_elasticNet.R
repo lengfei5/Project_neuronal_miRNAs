@@ -120,6 +120,56 @@ select.tuning.parameters.for.glmnet = function(xx, yy, alpha = 0.1, fit, cv.fit,
   
 }
 
+Regroup.Highly.Correlated.Neurons = function(x, cor.cutoff = 0.8, plot.grouping.result = TRUE)
+{
+  cat("regroup highly correlated neurons using correlation cutoff ...\n")
+  
+  cat("correlation cutoff --", cor.cutoff, "----------\n")
+  cat("initally there are : ", ncol(x), " neuron groups\n")
+  
+  dissimilarity <- 1 - cor((x))
+  distance <- as.dist(dissimilarity) 
+  #cutoff.dist = 1 - cor.cutoff
+  cluster.groups <- hclust(distance, method="complete") 
+  groups <- cutree(cluster.groups, h = (1-cor.cutoff))
+  nb.clusters = length(unique(groups))
+  
+  cat("after clustering there are : ", length(unique(groups)), " new groups \n")
+  
+  if(plot.grouping.result){
+    #cutoff = 0.8;
+    plot(cluster.groups, main="Dissimilarity = 1 - Correlation", xlab="") 
+    rect.hclust(cluster.groups, k = length(unique(groups)), border="red") 
+  }
+  
+  # regroup proportion matrix
+  newdata = matrix(NA, ncol = nb.clusters, nrow = nrow(x))
+  rownames(newdata) = rownames(x)
+  colnames(newdata) = rep('X', ncol(newdata))
+  
+  for(n in 1:nb.clusters)
+  {
+    # n = 4
+    kk = which(groups == n)
+    cat("cluster", n, "-- nb of neuron groups --", length(kk), "--", names(groups)[kk],"\n")
+    
+    if(length(kk)==0){
+      cat("Error-- no neuron classes found \n")
+    }else{
+      if(length(kk)>1){
+        newdata[,n] = apply(x[, kk], 1, sum)
+        colnames(newdata)[n] = paste0(names(groups)[kk], collapse = ".")
+      }else{
+        newdata[,n] = x[, kk]
+        colnames(newdata)[n] = names(groups)[kk];
+      }
+    }
+  }
+  
+  return(newdata >0)
+  
+}
+
 ########################################################
 ########################################################
 # Section: test glmnet with global alpha and gene-specific alpha
@@ -200,7 +250,7 @@ run.glmnet.select.tuning.parameters = function(x, y, alphas = seq(0.1, 0.5, by=0
       if(!all(res==0)){
         if( ! plot.cluster.col){
           res[which(res==0)] = NA;
-          pheatmap(log2(res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+          pheatmap((res), cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
                    cluster_cols=plot.cluster.col, main = paste0("alpha = ", alpha, " - method : ", method), na_col = "gray30",
                    color = cols)
         }else{

@@ -12,7 +12,7 @@ library("pheatmap")
 library("RColorBrewer")
 source('miRNAseq_functions.R')
 
-fitting.space = "linear" ## linear or log2 transformed for expression matrix
+fitting.space = "log2" ## linear or log2 transformed for expression matrix
 Use.coarse.neuronClass.FractionMatrix = FALSE
 
 Data.complete = TRUE
@@ -357,18 +357,21 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   ##########################################
   # glmnet with global alpha parameter or gene-specific alpha parameters
   ##########################################
-  #require(glmnet)
   library("pheatmap")
   library("RColorBrewer")
   TEST.glmnet.gene.specific.alpha = FALSE
   save.deconvolution.results.for.downstream.analysis = TRUE
   
+  Regroup.highly.correlated.neurons = TRUE
   Test.groupLasso = FALSE;
   
+  if(Regroup.highly.correlated.neurons){
+    source("select_tuningParams_elasticNet.R")
+    x = Regroup.Highly.Correlated.Neurons(x, cor.cutoff = 0.8, plot.grouping.result = FALSE)
+  }
   #Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
   #Methods2test = c("cv.lambda.1se", "bic")
-  Methods2test = c("cv.lambda.min")
-  #Methods2test = c("cv.lambda.1se")
+  Methods2test = c("cv.lambda.1se")
   #alphas = c(seq(0.1, 1, by= 0.1))
   alphas = c(0.005, seq(0.01, 0.1, by= 0.01), seq(0.2, 1, by=0.1))
   #alphas = c(0.1)
@@ -382,9 +385,10 @@ if(!Use.coarse.neuronClass.FractionMatrix){
     alpha.hyperparam = "global.alpha"
   }
   
-  testDir = paste0(resDir, "deconv_results_linear")
+  testDir = paste0(resDir, "deconv_results")
   
   if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
+  
   
   source("select_tuningParams_elasticNet.R")
   for(method in Methods2test)
@@ -401,7 +405,7 @@ if(!Use.coarse.neuronClass.FractionMatrix){
     
     if(!Test.groupLasso){
       keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
-                                                 Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha, weights = weights);
+                                                 Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
     }else{
       #source("select_tuningParams_elasticNet.R")
       keep = run.gglasso.select.tuning.parameters(x, y, cor.cutoff=seq(1, 0.5, by= -0.1), method = method, lambda = lambda, intercept = TRUE, nfold = 7)
