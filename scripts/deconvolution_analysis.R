@@ -347,7 +347,7 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   if(fitting.space == "linear"){
     weights = expr.vars[, match(colnames(y), colnames(expr.vars))]
     weights = weights[match(rownames(y), rownames(weights)), ]
-    weights = (1/weights)
+    weights = (1/weights)^0.5
   }
   
   res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
@@ -368,8 +368,9 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   #Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
   #Methods2test = c("cv.lambda.1se", "bic")
   Methods2test = c("cv.lambda.min")
+  #Methods2test = c("cv.lambda.1se")
   #alphas = c(seq(0.1, 1, by= 0.1))
-  alphas = c(0.005, seq(0.01, 0.1, by= 0.01))
+  alphas = c(0.005, seq(0.01, 0.1, by= 0.01), seq(0.2, 1, by=0.1))
   #alphas = c(0.1)
   lambda = 10^seq(-3, 3, length.out = 500)
   nlambda = 500;
@@ -413,6 +414,7 @@ if(!Use.coarse.neuronClass.FractionMatrix){
                                            version.analysis, ".Rdata"))
     
   }
+  
   
   if(save.deconvolution.results.for.downstream.analysis){
     
