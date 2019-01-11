@@ -12,14 +12,12 @@ library("pheatmap")
 library("RColorBrewer")
 source('miRNAseq_functions.R')
 
+fitting.space = "linear" ## linear or log2 transformed for expression matrix
+Use.coarse.neuronClass.FractionMatrix = FALSE
+
 Data.complete = TRUE
-fitting.space = "log2" ## linear or log2 transformed for expression matrix
-
 Use.mergedFractionMatrix = TRUE
-Use.coarse.neuronClass.FractionMatrix = TRUE
-
 add.background.sample.in.fitting.linear.space = TRUE
-
 Use.mergedExpressionMatrix = FALSE # group the genes if they show similar gene expression pattern
 
 Manually.unifiy.sample.names.forMatrix = TRUE
@@ -349,15 +347,120 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   if(fitting.space == "linear"){
     weights = expr.vars[, match(colnames(y), colnames(expr.vars))]
     weights = weights[match(rownames(y), rownames(weights)), ]
-    weights = (1/weights)^0.25
+    weights = (1/weights)
   }
- 
+  
+  res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
+  colnames(res) = colnames(y)
+  rownames(res) = colnames(x)
+  
+  ##########################################
+  # glmnet with global alpha parameter or gene-specific alpha parameters
+  ##########################################
+  #require(glmnet)
+  library("pheatmap")
+  library("RColorBrewer")
+  TEST.glmnet.gene.specific.alpha = FALSE
+  save.deconvolution.results.for.downstream.analysis = TRUE
+  
+  Test.groupLasso = FALSE;
+  
+  #Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
+  #Methods2test = c("cv.lambda.1se", "bic")
+  Methods2test = c("cv.lambda.min")
+  #alphas = c(seq(0.1, 1, by= 0.1))
+  alphas = c(0.005, seq(0.01, 0.1, by= 0.01))
+  #alphas = c(0.1)
+  lambda = 10^seq(-3, 3, length.out = 500)
+  nlambda = 500;
+  
+  # make a folder for the result
+  if(TEST.glmnet.gene.specific.alpha) {
+    alpha.hyperparam = "gene.specific.alpha"
+  }else{
+    alpha.hyperparam = "global.alpha"
+  }
+  
+  testDir = paste0(resDir, "deconv_results_linear")
+  
+  if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
+  
+  source("select_tuningParams_elasticNet.R")
+  for(method in Methods2test)
+  {
+    cat("-- model selection method -- ", method, "\n")
+    pdfname = paste0(testDir, "/deconv_res", 
+                     "_fitting.", fitting.space, 
+                     "_glmnet_global_alpha_method_select_tuning_parameters_", method, "_", alpha.hyperparam, version.analysis, 
+                     ".pdf")
+    
+    pdf(pdfname, width=22, height = 10)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    par(mfrow=c(1, 1))
+    
+    if(!Test.groupLasso){
+      keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
+                                                 Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha, weights = weights);
+    }else{
+      #source("select_tuningParams_elasticNet.R")
+      keep = run.gglasso.select.tuning.parameters(x, y, cor.cutoff=seq(1, 0.5, by= -0.1), method = method, lambda = lambda, intercept = TRUE, nfold = 7)
+      
+    }
+    
+    dev.off()
+    
+    save(x, y, alphas, keep, file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
+                                           version.analysis, ".Rdata"))
+    
+  }
+  
+  if(save.deconvolution.results.for.downstream.analysis){
+    
+    method = "cv.lambda.1se"
+    alpha.hyperparam = "global.alpha"
+    load(file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
+                       version.analysis, ".Rdata"))
+    
+    tabDir = paste0(resDir, "deconv_results/tables_logscale/")
+    if(!dir.exists(tabDir)) system(paste0('mkdir -p ', tabDir))
+    
+    pdfname = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", 
+                     method, "_", alpha.hyperparam,
+                     version.analysis, ".pdf")
+    pdf(pdfname, width=20, height = 12)
+    par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
+    par(mfrow=c(1, 1))
+    
+    for(n in 1:length(alphas)){
+      # n = 9;
+      cat("alpha -- ", alphas[n], "\n")
+      res = keep[[n]];
+      
+      source("select_tuningParams_elasticNet.R")
+      res = clustering.gene.neuronClass(res);
+      
+      write.csv(res, file = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam, 
+                                   version.analysis, "_alpha_", alphas[n], ".csv"), row.names = TRUE)
+      
+      cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(100)
+      pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
+               cluster_cols=FALSE, main = paste0("alpha = ", alphas[n], " -- ", method), na_col = "white",
+               color = cols)
+      
+    }
+    
+    dev.off()
+    
+  }
   
 }else{
   # write.csv(x, file = "/Volumes/groups/cochella/Chiara/table_cellNbs_in_Sensory_Motor_Inter_for_14_Samples.csv")
-  pdfname = paste0(testDir, "/deconv_test", version.analysis, 
+  coarseGroup_Dir = paste0(resDir, "deconv_results_log2_coarse")
+  if(!dir.exists(coarseGroup_Dir)) system(paste0('mkdir -p ', coarseGroup_Dir))
+  
+  pdfname = paste0(coarseGroup_Dir, "/deconv_coaseGroup",
                    "_fitting.", fitting.space, 
-                   "_Lasso.pdf")
+                   "_Lasso",  version.analysis, ".pdf")
   
   pdf(pdfname, width=20, height = 12)
   par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
@@ -366,115 +469,24 @@ if(!Use.coarse.neuronClass.FractionMatrix){
   source("select_tuningParams_elasticNet.R")
   keep.coarse = run.glmnet.for.coarse.groups(x, y)
   
+  
+  res[which(is.na(res))] = 0 
+  cols = c("white", colorRampPalette((brewer.pal(n = 7, name="Reds")))(10))
+  pheatmap(res, cluster_rows=FALSE, show_rownames=TRUE, show_colnames = TRUE,
+           cluster_cols=TRUE, main = paste0(" coarse group of neurons"), na_col = "white",
+           color = cols)
+  
   dev.off()
   
   save(keep.coarse, file = paste0(RdataDir, "preliminary_results_for_Coarse_neuronGroups", version.analysis, ".Rdata"))
   
-}
-
-res = matrix(NA, nrow = ncol(x), ncol = ncol(y)) 
-colnames(res) = colnames(y)
-rownames(res) = colnames(x)
-#x.ms = apply(x, 2, sum)
-#x = x[, which(x.ms>0)]
-#x = x>0
-
-##########################################
-# glmnet with global alpha parameter or gene-specific alpha parameters
-##########################################
-#require(glmnet)
-library("pheatmap")
-library("RColorBrewer")
-TEST.glmnet.gene.specific.alpha = FALSE
-save.deconvolution.results.for.downstream.analysis = TRUE
-
-Test.groupLasso = FALSE;
-
-#Methods2test = c("cv.lambda.1se", "cv.lambda.min", "bic", "aic", "aicc")
-#Methods2test = c("cv.lambda.1se", "bic")
-Methods2test = c("cv.lambda.1se")
-alphas = c(seq(0.1, 1.0, by= 0.1))
-#alphas = c(0.1)
-lambda = 10^seq(-3, 3, length.out = 500)
-nlambda = 500;
-
-# make a folder for the result
-if(TEST.glmnet.gene.specific.alpha) {
-  alpha.hyperparam = "gene.specific.alpha"
-}else{
-  alpha.hyperparam = "global.alpha"
-}
-
-testDir = paste0(resDir, "deconv_results_log2_groupLasso")
-    
-if(!dir.exists(testDir)) system(paste0('mkdir -p ', testDir))
-
-source("select_tuningParams_elasticNet.R")
-for(method in Methods2test)
-{
-  cat("-- model selection method -- ", method, "\n")
-  pdfname = paste0(testDir, "/deconv_res", 
-                   "_fitting.", fitting.space, 
-                   "_glmnet_global_alpha_method_select_tuning_parameters_", method, "_", alpha.hyperparam, version.analysis, 
-                   ".pdf")
-  
-  pdf(pdfname, width=22, height = 10)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(1, 1))
-  
-  if(!Test.groupLasso){
-    keep = run.glmnet.select.tuning.parameters(x, y, alphas = alphas, method = method, lambda = lambda, intercept = TRUE, standardize = TRUE, nfold = 7, 
-                                               Gene.Specific.Alpha = TEST.glmnet.gene.specific.alpha);
-  }else{
-    #source("select_tuningParams_elasticNet.R")
-    keep = run.gglasso.select.tuning.parameters(x, y, cor.cutoff=seq(1, 0.5, by= -0.1), method = method, lambda = lambda, intercept = TRUE, nfold = 7)
-    
-  }
+  res = keep.coarse;
  
-  dev.off()
   
-  save(x, y, alphas, keep, file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
-                                        version.analysis, ".Rdata"))
+  write.csv(res, file = paste0(coarseGroup_Dir, "/deconvolution_results_glmnet_Lasso_method_fitting_", fitting.space, 
+                               "_", version.analysis, ".csv"), row.names = TRUE)
   
 }
 
-if(save.deconvolution.results.for.downstream.analysis){
-  
-  method = "cv.lambda.1se"
-  alpha.hyperparam = "global.alpha"
-  load(file = paste0(RdataDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam,
-                     version.analysis, ".Rdata"))
-  
-  tabDir = paste0(resDir, "deconv_results/tables_logscale/")
-  if(!dir.exists(tabDir)) system(paste0('mkdir -p ', tabDir))
-  
-  pdfname = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", 
-                   method, "_", alpha.hyperparam,
-                   version.analysis, ".pdf")
-  pdf(pdfname, width=20, height = 12)
-  par(cex =0.7, mar = c(3,3,2,0.8)+0.1, mgp = c(1.6,0.5,0),las = 0, tcl = -0.3)
-  par(mfrow=c(1, 1))
-  
-  for(n in 1:length(alphas)){
-    # n = 9;
-    cat("alpha -- ", alphas[n], "\n")
-    res = keep[[n]];
-    
-    source("select_tuningParams_elasticNet.R")
-    res = clustering.gene.neuronClass(res);
-    
-    write.csv(res, file = paste0(tabDir, "deconvolution_results_glmnet_log2scale_method_", method, "_", alpha.hyperparam, 
-                     version.analysis, "_alpha_", alphas[n], ".csv"), row.names = TRUE)
-    
-    cols = colorRampPalette((brewer.pal(n = 7, name="Reds")))(100)
-    pheatmap(res, cluster_rows=TRUE, show_rownames=TRUE, show_colnames = TRUE,
-             cluster_cols=FALSE, main = paste0("alpha = ", alphas[n], " -- ", method), na_col = "white",
-             color = cols)
-
-  }
-  
-  dev.off()
-  
-}
 
 
