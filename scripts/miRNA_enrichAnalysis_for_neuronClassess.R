@@ -8,7 +8,6 @@
 ## Date of creation: Wed Mar  7 10:38:23 2018
 ##################################################
 ##################################################
-
 #### Functions
 process.countTable = function(all, design)
 {
