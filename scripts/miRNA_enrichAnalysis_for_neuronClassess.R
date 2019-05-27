@@ -8,42 +8,17 @@
 ## Date of creation: Wed Mar  7 10:38:23 2018
 ##################################################
 ##################################################
-#### Functions
-process.countTable = function(all, design)
-{
-  index = c()
-  for(n in 1:nrow(design))
-  {
-    #n = 1;
-    jj = intersect(grep(design$SampleID[n], colnames(all)), grep("Total.count", colnames(all)));
-    if(length(jj)==1) {
-      index = c(index,jj)
-    }else{
-      print(paste0("ERROR for sample--", design$SampleID[n]))
-    }
-  }
-  
-  newall = data.frame(as.character(all[,1]),  as.matrix(all[, index]), stringsAsFactors = FALSE)
-  colnames(newall)[1] = "gene";
-  colnames(newall)[-1] = paste0(design$genotype, "_", design$tissue.cell, "_", design$treatment, "_",  design$SampleID)
-  
-  return(newall)
-}
-
-find.mirName = function(x){test = unlist(strsplit(as.character(x), '-'));
-return(paste0(test[-c(1,length(test))], collapse = '-'))
-} # this function is not used here
-
-
 ### data verision and analysis version   
 version.Data = 'miRNAs_neurons_v1';
 version.analysis = paste0(version.Data, "_2018_03_07")
+
+miRNAfunctions = "/Volumes/groups/cochella/jiwang/scripts/functions/miRNAseq_functions.R"
 
 ### Directories to save results
 design.file = "../exp_design/Neuron_project_design_all_v1.xlsx"
 dataDir = "../data"
 resDir = paste0("../results/miRNAs_neurons_enrichment")
-tabDir =  paste0(resDir, "/tables/")
+tabDir =  paste0(resDir, "/tables_mutants/")
 RdataDir = paste0(resDir, "/Rdata/")
 if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
@@ -70,7 +45,8 @@ if(Processing.design.matrix){
   design$treatment[kk] = "treated"
   jj = grep("henn-1", design$genotype)
   design$genotype[jj] = "henn1.mutant"
-  design$genotype[grep("WT", design$genotype)] = "WT"
+  #design$genotype[grep("WT", design$genotype)] = "WT"
+  
   design$promoter = sapply(design$promoter, function(x) unlist(strsplit(as.character(x), ":"))[1])
   design$promoter = sapply(design$promoter, function(x) gsub('_', '.', x))
   design$tissue.cell = sapply(design$tissue.cell, function(x) gsub(' ', '.', x))
@@ -80,7 +56,6 @@ if(Processing.design.matrix){
 
 ## make the data table
 xlist <- list.files(path=paste0(dataDir), pattern = "*.txt", full.names = TRUE) ## list of data set to merge
-
 if(length(xlist)>1){
   all = NULL
   ggs = NULL
@@ -105,8 +80,81 @@ if(length(xlist)>1){
 }else{
   all = read.delim(paste0(dataDir, "cel_countTable.txt"), sep = "\t", header = TRUE)
 }
-# processing count table
-all = process.countTable(all=all, design = design);
+
+# processing count table for data before new nf-pipeline 
+source(miRNAfunctions)
+jj = grep("WT_tax4", design$genotype)
+all = process.countTable.v1(all=all, design = design[-jj, ]); # process.countTable.v1 is the function version used before
+
+##########################################
+# processing count table, 
+# piRNAs total nb of reads and other stat numbers
+# spike-in 
+##########################################
+# table for read counts and UMI
+aa = read.delim(paste0(dataDir, "/R7794_nf_all/countTable.txt"), sep = "\t", header = TRUE)
+
+# spike-ins 
+spikes = read.delim(paste0(dataDir, "/R7794_nf_all/spikeInTable.txt"), sep="\t", header = TRUE, row.names = 1)
+
+# start to process table and merge them into one
+kk = grep("piRNA_", aa$Name)
+if(length(kk)>0){
+  piRNAs = aa[kk, ]
+  aa = aa[-kk,]
+}
+
+source(miRNAfunctions)
+
+jj2 = which(design$promoter == "osm-5")
+all2 = process.countTable(all=aa, design = design[jj2, c(1:5)], select.counts = "Total.count")
+
+xx = as.matrix(all[, -1])
+xx[which(is.na(xx))] = 0
+stat.miRNAs = floor(apply(xx, 2, sum))
+piRNAs = process.countTable(all= piRNAs, design = design[jj2, c(1:5)], select.counts = "GM.count")
+
+piRNAs = as.matrix(piRNAs[, -1])
+piRNAs[which(is.na(piRNAs))] = 0
+stat.piRNAs = floor(apply(piRNAs, 2, sum))
+#all = rbind(c('total.piRNAs', stat.piRNAs), all)
+
+spikes = data.frame(gene=rownames(spikes), spikes, stringsAsFactors = FALSE)
+spikes = process.countTable(all=spikes, design =  design[jj2, c(1:5)], select.counts = "Total.spikeIn")
+
+total.spikes = floor(apply(as.matrix(spikes[, -1]), 2, sum))
+
+##########################################
+# quick comparison between old pipeline and new pipeline from nf-all 
+##########################################
+Compare.old.and.new.nf_pipeline = FALSE
+if(Compare.old.and.new.nf_pipeline){
+  mm = match(all$gene, all2$gene)
+  for(id2check in c("52632", "52633", "52634", "52635"))
+  {
+    yy1 = all[, grep(id2check, colnames(all))]
+    yy2 = all2[mm, grep(id2check, colnames(all2))]
+    plot(yy1, yy2, log='xy'); abline(0, 1, lwd=2.0, col='red')
+    #abline(v=23)
+    cat(" id : ", id2check, "--", all$gene[which(abs(yy1-yy2)>1)], "--diff --", (yy1-yy2)[which(abs(yy1-yy2)>1)] ,"..\n")
+  }
+  
+  # check the piRNA counts
+  load( file = paste0("../results/tables_for_decomvolution/Rdata/", 
+                      'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', 
+                      "miRNAs_neurons_v1_2018_03_07", '.Rdata'))
+  
+  plot(stat.piRNAs[c(1:4)], stats$piRNA[grep("52632|52633|52634|52635", rownames(stats))], log='xy');abline(0, 1, lwd=2.0, col='red')
+  
+}
+
+##########################################
+#  combine the old data set and new data from nf-all
+##########################################
+all = rbind(spikes, all);
+
+design.matrix = data.frame(design, stat.miRNAs, stat.piRNAs, total.spikes)
+
 
 save(design, all, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
 
@@ -131,7 +179,7 @@ if(Merge.techinical.replicates.N2){
   res.merged = Merge.techinical.replicates.using.design.countTable(design, all, id.list=rep.technical);
   all = res.merged$countTable
   design = res.merged$design
-} 
+}
 
 # filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
 if(Filter.lowly.expressed.using.predefined.miRNA.list){
