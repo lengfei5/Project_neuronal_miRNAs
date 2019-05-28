@@ -22,6 +22,8 @@ if(!dir.exists(resDir)){dir.create(resDir)}
 if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
+Compare.old.and.new.nf_pipeline = FALSE
+
 ##################################################
 ##################################################
 ## Section: Import Sample information and table of read counts
@@ -126,10 +128,10 @@ spikes = process.countTable(all=spikes, design =  design[jj2, c(1:5)], select.co
 
 total.spikes = floor(apply(as.matrix(spikes[, -1]), 2, sum))
 
+all2 = rbind(spikes, all2);
 ##########################################
 # quick comparison between old pipeline and new pipeline from nf-all 
 ##########################################
-Compare.old.and.new.nf_pipeline = FALSE
 if(Compare.old.and.new.nf_pipeline){
   mm = match(all$gene, all2$gene)
   for(id2check in c("52632", "52633", "52634", "52635"))
@@ -153,6 +155,76 @@ if(Compare.old.and.new.nf_pipeline){
 ##########################################
 #  combine the old data set and new data from nf-all
 ##########################################
-all = rbind(spikes, all);
+xx = Reduce(function(dtf1, dtf2) merge(dtf1, dtf2, by = "gene", all = TRUE), list(all, all2))
+#design.matrix = data.frame(design, stat.miRNAs, stat.piRNAs, total.spikes)
+all = xx
+save(design, all, stat.piRNAs, file=paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
 
-design.matrix = data.frame(design, stat.miRNAs, stat.piRNAs, total.spikes)
+########################################################
+########################################################
+# Section : merge technical replicates and filter genes
+# 
+########################################################
+########################################################
+load(file = paste0(RdataDir, 'Design_Raw_readCounts_', version.analysis, '.Rdata'))
+source(miRNAfunctions)
+
+Filter.lowly.expressed.using.predefined.miRNA.list = TRUE
+Filter.lowly.expressed.using.cpm.threshold = FALSE
+Merge.techinical.replicates.N2 = TRUE
+
+tcs = unique(design$tissue.cell)
+tcs = setdiff(tcs, c("whole.body", "whole.body.L3"))
+length(tcs)
+
+if(Merge.techinical.replicates.N2){
+  rep.technical = list(c("57751", "57753"), c("57752", "57754"))
+  res.merged = Merge.techinical.replicates.using.design.countTable(design, all, id.list=rep.technical);
+  all = res.merged$countTable
+  design = res.merged$design
+}
+
+# filter lowly expressed miRNA with list of predefined miRNAs that were identified using all untreated samples 
+if(Filter.lowly.expressed.using.predefined.miRNA.list){
+  list.expressed = read.csv(paste0(dataDir, "/list_expressed_miRNAs_using_Untreated_samples_Henn1_mutant_WT_all_cpm_10.csv"), 
+                            header = TRUE, as.is = c(1, 2))
+  expressed.miRNAs = find.mature.ones.for.prefixed.expressed.miRNAs(list.expressed)
+}
+
+if(Filter.lowly.expressed.using.cpm.threshold){ # filter the non-expressed miRNAs using cpm threshold
+  
+  kk = intersect(grep("L3", design$tissue.cell), which(design$treatment=='untreated'))
+  rownames(all) = all$gene 
+  ## the rownames should be the miRNA names
+  expressed.miRNAs = find.expressed.mature.miRNA.using.cpm.threshold(all[, (kk+1)], cpm.threshold=10)
+  
+}
+
+
+##########################################
+# check the quality using DESeq2 
+##########################################
+read.count = all[, -1]
+kk = c(1:nrow(design))
+design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
+raw = as.matrix(read.count[,kk])
+raw[which(is.na(raw))] = 0
+### start enrichment analysis 
+raw = floor(raw)
+rownames(raw) = all$gene
+
+index.qc = c(1, 3, 6)
+
+#norms = as.numeric(res.spike.in$norms4DESeq2)
+#norms = as.numeric(piRNAs)/median(as.numeric(piRNAs))
+
+source("RNAseq_Quality_Controls.R")
+pdfname = paste0(resDir, "/Data_qulity_assessment", version.analysis, ".pdf")
+
+pdf(pdfname, width = 18, height = 10)
+Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix[, index.qc])
+dev.off()
+
+
+
+

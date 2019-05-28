@@ -8,7 +8,7 @@
 ## Date of creation: Wed Mar  7 10:38:23 2018
 ##################################################
 ##################################################
-### data verision and analysis version   
+### data verision and analysis version
 version.Data = 'miRNAs_neurons_v1';
 version.analysis = paste0(version.Data, "_2018_03_07")
 
@@ -25,7 +25,7 @@ if(!dir.exists(tabDir)){dir.create(tabDir)}
 if(!dir.exists(RdataDir)){dir.create(RdataDir)}
 
 Analysis.newData.from.nf_all = TRUE
-
+# Use.N2 = FALSE
 ##################################################
 ##################################################
 ## Section: Import Sample information and table of read counts
