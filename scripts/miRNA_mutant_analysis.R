@@ -11,6 +11,7 @@ version.Data = 'miRNAs_neurons_v1';
 version.analysis = paste0(version.Data, "_2019_05_27")
 
 miRNAfunctions = "/Volumes/groups/cochella/jiwang/scripts/functions/miRNAseq_functions.R"
+QCfunctions = "/Volumes/groups/cochella/jiwang/scripts/functions/RNAseq_Quality_Controls.R"
 
 ### Directories to save results
 design.file = "../exp_design/Neuron_project_design_all_v1.xlsx"
@@ -218,7 +219,8 @@ index.qc = c(1, 3, 6)
 #norms = as.numeric(res.spike.in$norms4DESeq2)
 #norms = as.numeric(piRNAs)/median(as.numeric(piRNAs))
 
-source("RNAseq_Quality_Controls.R")
+source(QCfunctions)
+
 pdfname = paste0(resDir, "/Data_qulity_assessment", version.analysis, ".pdf")
 
 pdf(pdfname, width = 18, height = 10)
@@ -226,5 +228,86 @@ Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix[
 dev.off()
 
 
+##########################################
+# Normalize the all data with DESeq2  
+##########################################
+dds <- DESeqDataSetFromMatrix(raw, DataFrame(design), design = ~ genotype + treatment)
+#dds <- DESeqDataSetFromMatrix(countData, DataFrame(design.matrix), design = ~ condition + time)
+dds1 <- dds[ rowSums(counts(dds)) > 10, ]
+dds1 <- estimateSizeFactors(dds1)
+sizeFactors(dds) = sizeFactors(dds1)
+cpm = fpm(dds, robust = TRUE)
+colnames(cpm) = paste0(colnames(cpm), ".DESeq2norm")
+xx = log2(cpm + 0.1)
 
+pdfname = paste0(resDir, "/pairwise_comparisons_untreated_DESeq2_", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 16)
+pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.5)
+dev.off()
+
+##########################################
+# spike-in normalization
+##########################################
+index.spikeIn = grep("spikeIn", rownames(raw))[c(1:8)]
+spike.concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25)*100 ## the concentration is amol/mug-of-total-RNA
+
+## calculate scaling factor using spike-ins
+source(miRNAfunctions)
+
+jj = grep("WT_tax4", design$genotype)
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+par(mfrow=c(2,2))
+
+res.spike.in = calculate.scaling.factors.using.spikeIns(raw[,jj], concentrations = spike.concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
+#cpm = res.spike.in$cpm;
+res = res.spike.in$normalization.spikeIn
+#colnames(cpm) = paste0(colnames(cpm), ".cpm")
+colnames(res) = paste0(colnames(res), ".amol.per.mugRNA.normBySpikeIns")
+
+pdfname = paste0(resDir, "/pairwise_comparisons_spikeIns_normalization_untreated_", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 12)
+xx = log2(res + 0.01)
+pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.7)
+dev.off()
+
+##########################################
+# piRNA normalization
+##########################################
+# check the piRNA counts
+load( file = paste0("../results/tables_for_decomvolution/Rdata/", 
+                    'neuronalClasses_samples_countTables_piRAN_siRNA_stats_', 
+                    "miRNAs_neurons_v1_2018_03_07", '.Rdata'))
+
+piRNAs = c()
+for(id in design$SampleID[c(1:6)]){
+  piRNAs = c(piRNAs, stats$piRNA[grep(id, rownames(stats))])
+}
+
+piRNAs = c(piRNAs, stat.piRNAs)
+#piRNAs = design.matrix$stat.piRNAs
+sizefactors = as.numeric(piRNAs)
+cpm.piRNA = raw
+for(n in 1:ncol(cpm.piRNA))
+{
+  cpm.piRNA[,n] = raw[,n]/sizefactors[n]*10^6
+}
+colnames(cpm.piRNA) = paste0(colnames(cpm.piRNA), "normBy.piRNA")
+
+pdfname = paste0(resDir, "/pairwise_comparisons_piRNAs_normalization_untreated_", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 12)
+xx = log2(cpm.piRNA + 0.01)
+pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.4)
+dev.off()
+
+if(Save.Tables){
+  yy = data.frame(cpm, res, cpm.piRNA, stringsAsFactors = FALSE)
+  write.csv(yy, file = paste0(tabDir, "Normalized_Table_DESeq2_spikeIn_piRNAs_normalized_for", version.analysis, ".csv"), 
+            row.names = TRUE)
+}
+
+plot(xx[, c(15, 16)]); abline(0, 1, lwd=2.0, col='red')
 
