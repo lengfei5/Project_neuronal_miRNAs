@@ -201,7 +201,6 @@ if(Filter.lowly.expressed.using.cpm.threshold){ # filter the non-expressed miRNA
   
 }
 
-
 ##########################################
 # check the quality using DESeq2 
 ##########################################
@@ -226,7 +225,6 @@ pdfname = paste0(resDir, "/Data_qulity_assessment", version.analysis, ".pdf")
 pdf(pdfname, width = 18, height = 10)
 Check.RNAseq.Quality(read.count=read.count[, kk], design.matrix = design.matrix[, index.qc])
 dev.off()
-
 
 ##########################################
 # Normalize the all data with DESeq2  
