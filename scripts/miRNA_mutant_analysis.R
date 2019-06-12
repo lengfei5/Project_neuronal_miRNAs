@@ -201,9 +201,6 @@ if(Filter.lowly.expressed.using.cpm.threshold){ # filter the non-expressed miRNA
   
 }
 
-##########################################
-# check the quality using DESeq2 
-##########################################
 read.count = all[, -1]
 kk = c(1:nrow(design))
 design.matrix = data.frame(sample=colnames(read.count)[kk], design[kk, ])
@@ -213,11 +210,13 @@ raw[which(is.na(raw))] = 0
 raw = floor(raw)
 rownames(raw) = all$gene
 
+##########################################
+# check the quality using DESeq2 
+##########################################
 index.qc = c(1, 3, 6)
 
 #norms = as.numeric(res.spike.in$norms4DESeq2)
 #norms = as.numeric(piRNAs)/median(as.numeric(piRNAs))
-
 source(QCfunctions)
 
 pdfname = paste0(resDir, "/Data_qulity_assessment", version.analysis, ".pdf")
@@ -241,35 +240,6 @@ xx = log2(cpm + 0.1)
 pdfname = paste0(resDir, "/pairwise_comparisons_untreated_DESeq2_", version.analysis, ".pdf")
 pdf(pdfname, width = 16, height = 16)
 pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.5)
-dev.off()
-
-##########################################
-# spike-in normalization
-##########################################
-index.spikeIn = grep("spikeIn", rownames(raw))[c(1:8)]
-spike.concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25)*100 ## the concentration is amol/mug-of-total-RNA
-
-## calculate scaling factor using spike-ins
-source(miRNAfunctions)
-
-jj = grep("WT_tax4", design$genotype)
-pdfname = paste0(resDir, "/Spike_in_signals_normalized_", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 10)
-par(mfrow=c(2,2))
-
-res.spike.in = calculate.scaling.factors.using.spikeIns(raw[,jj], concentrations = spike.concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
-
-dev.off()
-
-#cpm = res.spike.in$cpm;
-res = res.spike.in$normalization.spikeIn
-#colnames(cpm) = paste0(colnames(cpm), ".cpm")
-colnames(res) = paste0(colnames(res), ".amol.per.mugRNA.normBySpikeIns")
-
-pdfname = paste0(resDir, "/pairwise_comparisons_spikeIns_normalization_untreated_", version.analysis, ".pdf")
-pdf(pdfname, width = 16, height = 12)
-xx = log2(res + 0.01)
-pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.7)
 dev.off()
 
 ##########################################
@@ -300,6 +270,47 @@ pdf(pdfname, width = 16, height = 12)
 xx = log2(cpm.piRNA + 0.01)
 pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.4)
 dev.off()
+
+## test the difference with piRNA normalization
+source(miRNAfunctions)
+sels = c(1:18)
+
+yy1 = enrichmentAnalysis.for.mutant.Norm.piRNA(raw[grep("spikeIn", rownames(raw),invert = TRUE), sels], design[sels, ], sfs = sizefactors[sels])
+
+if(Save.Tables){
+  write.csv(yy1, file = paste0(tabDir, "Table_differentTest_for_piRNAs_normalized_", version.analysis, ".csv"), 
+            row.names = TRUE)
+}
+
+##########################################
+# spike-in normalization
+##########################################
+index.spikeIn = grep("spikeIn", rownames(raw))[c(1:8)]
+spike.concentrations = c(0.05, 0.25, 0.5, 1.5, 2.5, 3.5, 5, 25)*100 ## the concentration is amol/mug-of-total-RNA
+
+## calculate scaling factor using spike-ins
+source(miRNAfunctions)
+
+jj = grep("WT_tax4", design$genotype)
+pdfname = paste0(resDir, "/Spike_in_signals_normalized_", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 10)
+par(mfrow=c(2,2))
+
+res.spike.in = calculate.scaling.factors.using.spikeIns(raw[,jj], concentrations = spike.concentrations, index.spikeIn = index.spikeIn, read.threshold = 5)
+
+dev.off()
+
+#cpm = res.spike.in$cpm;
+res = res.spike.in$normalization.spikeIn
+#colnames(cpm) = paste0(colnames(cpm), ".cpm")
+colnames(res) = paste0(colnames(res), ".amol.per.mugRNA.normBySpikeIns")
+
+pdfname = paste0(resDir, "/pairwise_comparisons_spikeIns_normalization_untreated_", version.analysis, ".pdf")
+pdf(pdfname, width = 16, height = 12)
+xx = log2(res + 0.01)
+pairs(xx[, grep('_untreated', colnames(xx))], lower.panel=NULL, upper.panel=panel.fitting, cex = 0.7)
+dev.off()
+
 
 if(Save.Tables){
   yy = data.frame(cpm, res, cpm.piRNA, stringsAsFactors = FALSE)
